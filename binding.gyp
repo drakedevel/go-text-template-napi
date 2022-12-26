@@ -7,8 +7,7 @@
       'inputs': [
         'gobuild.py',
         'go.mod',
-        'main.go',
-        'exports.go',
+        '<!@(go list -f \'{{ range .GoFiles }}{{ $.Dir }}/{{ . }} {{ end }}{{ range .CgoFiles }}{{ $.Dir }}/{{ . }} {{ end }}\' ./...)',
       ],
       'action': ['python', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
     }],
