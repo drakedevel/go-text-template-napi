@@ -1,3 +1,1 @@
-binding.h
-binding.node
-*.so
+/build/
