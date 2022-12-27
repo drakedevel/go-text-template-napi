@@ -9,7 +9,7 @@
         'go.mod',
         '<!@(go list -f \'{{ range .GoFiles }}{{ $.Dir }}/{{ . }} {{ end }}{{ range .CgoFiles }}{{ $.Dir }}/{{ . }} {{ end }}\' ./...)',
       ],
-      'action': ['python', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
+      'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
     }],
     'conditions': [
       # TODO: Other platforms

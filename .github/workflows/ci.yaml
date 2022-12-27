@@ -15,3 +15,5 @@ jobs:
       with:
         node-version: '16'
     - run: npm ci
+    - name: Verify binding can be require()d
+      run: node -r ./build/Release/binding -e ''
