@@ -1,4 +1,4 @@
-package main
+package napi
 
 // #include <stdlib.h>
 // #include <node_api.h>
@@ -10,33 +10,36 @@ import (
 	"unsafe"
 )
 
-type napiCallback func(env napiEnv, value C.napi_callback_info) C.napi_value
-type napiFinalize func(env napiEnv, data unsafe.Pointer)
+type Callback C.napi_callback
+type CallbackInfo C.napi_callback_info
+type Finalize C.napi_finalize
+
+type callbackFunc func(env Env, value CallbackInfo) Value
+type finalizeFunc func(env Env, data unsafe.Pointer)
 type cleanupFunc func()
 
 //export genericNapiCallback
-func genericNapiCallback(env C.napi_env, info C.napi_callback_info) C.napi_value {
+func genericNapiCallback(rawEnv C.napi_env, rawInfo C.napi_callback_info) C.napi_value {
+	env := Env{rawEnv}
+	info := CallbackInfo(rawInfo)
 	var data unsafe.Pointer
-	status := C.napi_get_cb_info(env, info, nil, nil, nil, &data)
-	if status != C.napi_ok {
-		panic(status)
-	}
-	return unlaunderHandle(data).Value().(napiCallback)(napiEnv{env}, info)
+	env.GetCbInfo(info, nil, nil, nil, &data)
+	return C.napi_value(unlaunderHandle(data).Value().(callbackFunc)(env, info))
 }
 
-func makeNapiCallback(cb napiCallback) (C.napi_callback, unsafe.Pointer, cleanupFunc) {
+func MakeNapiCallback(cb callbackFunc) (Callback, unsafe.Pointer, cleanupFunc) {
 	ptr, cleanup := launderHandle(cgo.NewHandle(cb))
-	return C.napi_callback(C.genericNapiCallback), ptr, cleanup
+	return Callback(C.genericNapiCallback), ptr, cleanup
 }
 
 //export genericNapiFinalize
 func genericNapiFinalize(env C.napi_env, data unsafe.Pointer, hint unsafe.Pointer) {
-	unlaunderHandle(hint).Value().(napiFinalize)(napiEnv{env}, data)
+	unlaunderHandle(hint).Value().(finalizeFunc)(Env{env}, data)
 }
 
-func makeNapiFinalize(cb napiFinalize) (C.napi_finalize, unsafe.Pointer, cleanupFunc) {
+func MakeNapiFinalize(cb finalizeFunc) (Finalize, unsafe.Pointer, cleanupFunc) {
 	ptr, cleanup := launderHandle(cgo.NewHandle(cb))
-	return C.napi_finalize(C.genericNapiFinalize), ptr, cleanup
+	return Finalize(C.genericNapiFinalize), ptr, cleanup
 }
 
 func launderHandle(handle cgo.Handle) (unsafe.Pointer, cleanupFunc) {

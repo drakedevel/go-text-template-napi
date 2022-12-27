@@ -1,32 +1,29 @@
 package main
 
-// #cgo linux LDFLAGS: -Wl,--unresolved-symbols=ignore-all
-// #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
-// #include <node_api.h>
-// napi_value napiModuleInit(napi_env env, napi_value exports);
-// NAPI_MODULE(go_text_template_napi_binding, napiModuleInit)
-import "C"
-import "fmt"
+import (
+	"fmt"
 
-//export napiModuleInit
-func napiModuleInit(rawEnv C.napi_env, exports C.napi_value) C.napi_value {
+	"github.com/drakedevel/go-text-template-napi/internal/napi"
+)
+
+func moduleInit(env napi.Env, exports napi.Value) napi.Value {
 	fmt.Printf("In N-API module Init\n")
 
-	var propDescs []C.napi_property_descriptor
+	var propDescs []napi.PropertyDescriptor
 
-	env := napiEnv{rawEnv}
-	propDescs = append(propDescs, C.napi_property_descriptor{
-		name:       env.CreateString("Template"),
-		value:      buildTemplateClass(env),
-		attributes: C.napi_enumerable,
+	propDescs = append(propDescs, napi.PropertyDescriptor{
+		Name:       env.CreateString("Template"),
+		Value:      buildTemplateClass(env),
+		Attributes: napi.Enumerable,
 	})
 
-	status := C.napi_define_properties(env.inner, exports, C.ulong(len(propDescs)), &propDescs[0])
-	if status != C.napi_ok {
-		panic(status)
-	}
+	env.DefineProperties(exports, propDescs)
 
 	return exports
+}
+
+func init() {
+	napi.SetModuleInit(moduleInit)
 }
 
 func main() {}

@@ -1,91 +1,73 @@
 package main
 
-// #include <node_api.h>
-import "C"
 import (
 	"fmt"
 	"runtime/cgo"
 	"unsafe"
+
+	"github.com/drakedevel/go-text-template-napi/internal/napi"
 )
 
 type template struct {
 	name string
 }
 
-func extractString(env napiEnv, value C.napi_value) string {
+func extractString(env napi.Env, value napi.Value) string {
 	// Get string length
-	var strLen C.size_t
-	status := C.napi_get_value_string_utf8(env.inner, value, nil, 0, &strLen)
-	if status != C.napi_ok {
-		panic(status)
-	}
+	strLen := env.GetValueString(value, nil)
 
 	// Allocate buffer and get string contents
 	buf := make([]byte, strLen+1)
-	status = C.napi_get_value_string_utf8(env.inner, value, (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)), &strLen)
-	if status != C.napi_ok {
-		panic(status)
-	}
+	strLen = env.GetValueString(value, buf)
 	return string(buf[0:strLen])
 }
 
-func templateMethodEntry(env napiEnv, info C.napi_callback_info) (this *template) {
-	var thisArg C.napi_value
-	// status := C.napi_get_cb_info(env.inner, info, &argc, &argv[0], &thisArg, nil)
-	status := C.napi_get_cb_info(env.inner, info, nil, nil, &thisArg, nil)
-	if status != C.napi_ok {
-		panic(status)
-	}
+func templateMethodEntry(env napi.Env, info napi.CallbackInfo) (this *template) {
+	// TODO: Process args?
+	var thisArg napi.Value
+	env.GetCbInfo(info, nil, nil, &thisArg, nil)
 
 	// Retrieve wrapped native object from JS object
 	// TODO: Type tagging
-	var wrapped unsafe.Pointer
-	status = C.napi_unwrap(env.inner, thisArg, &wrapped)
-	if status != C.napi_ok {
-		panic(status)
-	}
+	wrapped := env.Unwrap(thisArg)
 	handle := *(*cgo.Handle)(wrapped)
 
 	return handle.Value().(*template)
-
 }
 
-func buildTemplateClass(env napiEnv) C.napi_value {
+func buildTemplateClass(env napi.Env) napi.Value {
 	// Build property descriptors
-	var propDescs []C.napi_property_descriptor
+	var propDescs []napi.PropertyDescriptor
 
 	// TODO: Don't leak fooData
-	fooCb, fooData, _ := makeNapiCallback(templateMethodFoo)
-	propDescs = append(propDescs, C.napi_property_descriptor{
-		name:       env.CreateString("foo"),
-		method:     fooCb,
-		attributes: C.napi_default_method,
-		data:       fooData,
+	fooCb, fooData, _ := napi.MakeNapiCallback(templateMethodFoo)
+	propDescs = append(propDescs, napi.PropertyDescriptor{
+		Name:       env.CreateString("foo"),
+		Method:     fooCb,
+		Attributes: napi.DefaultMethod,
+		Data:       fooData,
 	})
 
 	// TODO: Don't leak barData
-	barCb, barData, _ := makeNapiCallback(templateMethodBar)
-	propDescs = append(propDescs, C.napi_property_descriptor{
-		name:       env.CreateString("bar"),
-		method:     barCb,
-		attributes: C.napi_default_method,
-		data:       barData,
+	barCb, barData, _ := napi.MakeNapiCallback(templateMethodBar)
+	propDescs = append(propDescs, napi.PropertyDescriptor{
+		Name:       env.CreateString("bar"),
+		Method:     barCb,
+		Attributes: napi.DefaultMethod,
+		Data:       barData,
 	})
 
 	// Define class
 	// TODO: Don't leak consData
-	consCb, consData, _ := makeNapiCallback(templateConstructor)
+	consCb, consData, _ := napi.MakeNapiCallback(templateConstructor)
 	return env.DefineClass("Template", consCb, consData, propDescs)
 }
 
-func templateConstructor(env napiEnv, info C.napi_callback_info) C.napi_value {
-	argc := C.size_t(1)
-	argv := make([]C.napi_value, 1)
-	var thisArg C.napi_value
-	status := C.napi_get_cb_info(env.inner, info, &argc, &argv[0], &thisArg, nil)
-	if status != C.napi_ok {
-		panic(status)
-	}
+func templateConstructor(env napi.Env, info napi.CallbackInfo) napi.Value {
+	argc := 1
+	argv := make([]napi.Value, 1)
+	var thisArg napi.Value
+	env.GetCbInfo(info, &argc, &argv[0], &thisArg, nil)
 	if argc != 1 {
 		// TODO: Throw
 		panic("expected an argument")
@@ -98,22 +80,19 @@ func templateConstructor(env napiEnv, info C.napi_callback_info) C.napi_value {
 	// TODO: Type tagging
 	handle := cgo.NewHandle(&data)
 	// TODO: Don't leak finalizeData
-	finalizeCb, finalizeData, _ := makeNapiFinalize(templateFinalize)
-	status = C.napi_wrap(env.inner, thisArg, unsafe.Pointer(&handle), finalizeCb, finalizeData, nil)
-	if status != C.napi_ok {
-		panic(status)
-	}
+	finalizeCb, finalizeData, _ := napi.MakeNapiFinalize(templateFinalize)
+	env.Wrap(thisArg, unsafe.Pointer(&handle), finalizeCb, finalizeData)
 
 	return nil
 }
 
-func templateFinalize(env napiEnv, data unsafe.Pointer) {
+func templateFinalize(env napi.Env, data unsafe.Pointer) {
 	fmt.Printf("In Template finalize\n")
 	handle := *(*cgo.Handle)(data)
 	handle.Delete()
 }
 
-func templateMethodFoo(env napiEnv, info C.napi_callback_info) C.napi_value {
+func templateMethodFoo(env napi.Env, info napi.CallbackInfo) napi.Value {
 	this := templateMethodEntry(env, info)
 	fmt.Println("name:", this.name)
 	this.name = this.name + "-foo"
@@ -121,6 +100,6 @@ func templateMethodFoo(env napiEnv, info C.napi_callback_info) C.napi_value {
 	return nil
 }
 
-func templateMethodBar(env napiEnv, info C.napi_callback_info) C.napi_value {
+func templateMethodBar(env napi.Env, info napi.CallbackInfo) napi.Value {
 	return nil
 }
