@@ -3,56 +3,30 @@ package main
 // #cgo linux LDFLAGS: -Wl,--unresolved-symbols=ignore-all
 // #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 // #include <node_api.h>
-// napi_value Init(napi_env env, napi_value exports);
-// napi_value ExportedFunc(napi_env env, napi_callback_info info);
-//
-// NAPI_MODULE(NODE_GYP_BINDING_NAME, Init)
-//
-// napi_status NapiCreateString(napi_env env, _GoString_ str, napi_value *result) {
-//   return napi_create_string_utf8(env, _GoStringPtr(str), _GoStringLen(str), result);
-// }
-//
-// napi_status NapiCreateFunction(napi_env env, _GoString_ name, napi_callback cb, void *data, napi_value *result) {
-//   return napi_create_function(env, _GoStringPtr(name), _GoStringLen(name), cb, data, result);
-// }
+// napi_value napiModuleInit(napi_env env, napi_value exports);
+// NAPI_MODULE(go_text_template_napi_binding, napiModuleInit)
 import "C"
 import "fmt"
 
-func RealInit(env C.napi_env, exports C.napi_value) C.napi_value {
+//export napiModuleInit
+func napiModuleInit(rawEnv C.napi_env, exports C.napi_value) C.napi_value {
 	fmt.Printf("In N-API module Init\n")
-	var fn C.napi_value
-	status := C.NapiCreateFunction(env, "hello", C.napi_callback(C.ExportedFunc), nil, &fn)
-	if status != C.napi_ok {
-		panic(status)
-	}
 
-	var propName C.napi_value
-	status = C.NapiCreateString(env, "hello", &propName)
-	if status != C.napi_ok {
-		panic(status)
-	}
+	var propDescs []C.napi_property_descriptor
 
-	propDesc := C.napi_property_descriptor{
-		name:       propName,
-		value:      fn,
+	env := napiEnv{rawEnv}
+	propDescs = append(propDescs, C.napi_property_descriptor{
+		name:       env.CreateString("Template"),
+		value:      buildTemplateClass(env),
 		attributes: C.napi_enumerable,
+	})
+
+	status := C.napi_define_properties(env.inner, exports, C.ulong(len(propDescs)), &propDescs[0])
+	if status != C.napi_ok {
+		panic(status)
 	}
-	status = C.napi_define_properties(env, exports, 1, &propDesc)
 
 	return exports
-}
-
-func RealExportedFunc(env C.napi_env, info C.napi_callback_info) C.napi_value {
-	var result C.napi_value
-	var status = C.NapiCreateString(env, "Hello, world!", &result)
-	if status != C.napi_ok {
-		panic(status)
-	}
-	return result
-}
-
-func init() {
-	fmt.Printf("In init function\n")
 }
 
 func main() {}
