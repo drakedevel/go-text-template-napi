@@ -132,16 +132,38 @@ func templateFinalize(env napi.Env, data unsafe.Pointer) {
 func convertTemplateData(env napi.Env, value napi.Value) interface{} {
 	valueType := env.Typeof(value)
 	switch valueType {
-	case napi.Undefined:
-		return nil
-	case napi.Null:
+	case napi.Undefined, napi.Null:
+		// TODO: Filter out Undefined from parent object, keep Null
 		return nil
 	// TODO: case napi.Boolean:
 	// TODO: case napi.Number:
 	case napi.String:
 		return extractString(env, value)
 	// TODO: case napi.Symbol:
-	// TODO: case napi.Object:
+	case napi.Object:
+		if env.IsArray(value) {
+			length := env.GetArrayLength(value)
+			result := make([]interface{}, length)
+			var i uint32
+			for i = 0; i < length; i++ {
+				// TODO: Scope?
+				result[i] = convertTemplateData(env, env.GetElement(value, i))
+			}
+			return result
+		} else {
+			// TODO: Should any other object types get special handling?
+			// TODO: Include prototypes with function support
+			propNames := env.GetAllPropertyNames(value, napi.KeyOwnOnly, napi.KeySkipSymbols, napi.KeyNumbersToStrings)
+			length := env.GetArrayLength(propNames)
+			result := map[string]interface{}{}
+			var i uint32
+			for i = 0; i < length; i++ {
+				// TODO: Scope?
+				key := env.GetElement(propNames, i)
+				result[extractString(env, key)] = convertTemplateData(env, env.GetProperty(value, key))
+			}
+			return result
+		}
 	// TODO: case napi.Function:
 	// TODO: case napi.External:
 	// TODO: case napi.Bigint:

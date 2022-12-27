@@ -1,5 +1,7 @@
 package napi
 
+// #include <stdbool.h>
+// #include <stdint.h>
 // #include <node_api.h>
 // #include "env_prelude.inc"
 import "C"
@@ -28,6 +30,15 @@ func (env Env) CreateString(str string) Value {
 		panic(status)
 	}
 	return Value(result)
+}
+
+func (env Env) GetArrayLength(value Value) uint32 {
+	var result C.uint32_t
+	status := C.napi_get_array_length(env.inner, C.napi_value(value), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return uint32(result)
 }
 
 func (env Env) GetValueString(value Value, buf []byte) int {
@@ -71,7 +82,69 @@ func (env Env) Typeof(value Value) ValueType {
 	return ValueType(result)
 }
 
+func (env Env) IsArray(value Value) bool {
+	var result C.bool
+	status := C.napi_is_array(env.inner, C.napi_value(value), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return bool(result)
+}
+
 // Working with JavaScript properties
+
+type KeyCollectionMode C.napi_key_collection_mode
+type KeyFilter C.napi_key_filter
+type KeyConversion C.napi_key_conversion
+
+const (
+	KeyIncludePrototypes KeyCollectionMode = C.napi_key_include_prototypes
+	KeyOwnOnly           KeyCollectionMode = C.napi_key_own_only
+
+	KeyAllProperties KeyFilter = C.napi_key_all_properties
+	KeyWritable      KeyFilter = C.napi_key_writable
+	KeyEnumerable    KeyFilter = C.napi_key_enumerable
+	KeyConfigurable  KeyFilter = C.napi_key_configurable
+	KeySkipStrings   KeyFilter = C.napi_key_skip_strings
+	KeySkipSymbols   KeyFilter = C.napi_key_skip_symbols
+
+	KeyKeepNumbers      KeyConversion = C.napi_key_keep_numbers
+	KeyNumbersToStrings KeyConversion = C.napi_key_numbers_to_strings
+)
+
+func (env Env) GetAllPropertyNames(object Value, keyMode KeyCollectionMode, keyFilter KeyFilter, keyConversion KeyConversion) Value {
+	var result C.napi_value
+	status := C.napi_get_all_property_names(
+		env.inner,
+		C.napi_value(object),
+		C.napi_key_collection_mode(keyMode),
+		C.napi_key_filter(keyFilter),
+		C.napi_key_conversion(keyConversion),
+		&result,
+	)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return Value(result)
+}
+
+func (env Env) GetProperty(object Value, key Value) Value {
+	var result C.napi_value
+	status := C.napi_get_property(env.inner, C.napi_value(object), C.napi_value(key), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return Value(result)
+}
+
+func (env Env) GetElement(object Value, index uint32) Value {
+	var result C.napi_value
+	status := C.napi_get_element(env.inner, C.napi_value(object), C.uint32_t(index), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return Value(result)
+}
 
 func (env Env) convertPropertyDescriptors(properties []PropertyDescriptor) (C.size_t, *C.napi_property_descriptor) {
 	if len(properties) == 0 {
