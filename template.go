@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"math/big"
 	"runtime/cgo"
 	"text/template"
 	"unsafe"
@@ -39,6 +41,32 @@ func extractString(env napi.Env, value napi.Value) string {
 	buf := make([]byte, strLen+1)
 	strLen = env.GetValueString(value, buf)
 	return string(buf[0:strLen])
+}
+
+func extractBigint(env napi.Env, value napi.Value) *big.Int {
+	// Get length
+	wordCount := 0
+	env.GetValueBigintWords(value, nil, &wordCount, nil)
+
+	// Allocate space and get contents
+	var signBit int
+	words := make([]uint64, wordCount)
+	env.GetValueBigintWords(value, &signBit, &wordCount, &words[0])
+
+	// Convert to big-endian bytes
+	var buf bytes.Buffer
+	for i := len(words) - 1; i >= 0; i-- {
+		binary.Write(&buf, binary.BigEndian, words[i])
+	}
+	fmt.Println("Bigint words", words)
+	fmt.Println("Bigint bytes", buf.Bytes())
+
+	result := new(big.Int)
+	result.SetBytes(buf.Bytes())
+	if signBit > 0 {
+		result.Neg(result)
+	}
+	return result
 }
 
 func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (this *templateObj, args []napi.Value) {
@@ -135,11 +163,12 @@ func convertTemplateData(env napi.Env, value napi.Value) interface{} {
 	case napi.Undefined, napi.Null:
 		// TODO: Filter out Undefined from parent object, keep Null
 		return nil
-	// TODO: case napi.Boolean:
-	// TODO: case napi.Number:
+	case napi.Boolean:
+		return env.GetValueBool(value)
+	case napi.Number:
+		return env.GetValueDouble(value)
 	case napi.String:
 		return extractString(env, value)
-	// TODO: case napi.Symbol:
 	case napi.Object:
 		if env.IsArray(value) {
 			length := env.GetArrayLength(value)
@@ -152,7 +181,6 @@ func convertTemplateData(env napi.Env, value napi.Value) interface{} {
 			return result
 		} else {
 			// TODO: Should any other object types get special handling?
-			// TODO: Include prototypes with function support
 			propNames := env.GetAllPropertyNames(value, napi.KeyOwnOnly, napi.KeySkipSymbols, napi.KeyNumbersToStrings)
 			length := env.GetArrayLength(propNames)
 			result := map[string]interface{}{}
@@ -164,9 +192,11 @@ func convertTemplateData(env napi.Env, value napi.Value) interface{} {
 			}
 			return result
 		}
-	// TODO: case napi.Function:
-	// TODO: case napi.External:
-	// TODO: case napi.Bigint:
+	case napi.Bigint:
+		return extractBigint(env, value)
+	case napi.External, napi.Function, napi.Symbol:
+		// No useful way to map these to Go types
+		panic("unsupported value type")
 	default:
 		fmt.Printf("unsupported type %v\n", valueType)
 		panic("unknown value type")

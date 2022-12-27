@@ -41,6 +41,45 @@ func (env Env) GetArrayLength(value Value) uint32 {
 	return uint32(result)
 }
 
+func (env Env) GetValueBool(value Value) bool {
+	var result C.bool
+	status := C.napi_get_value_bool(env.inner, C.napi_value(value), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return bool(result)
+}
+
+func (env Env) GetValueDouble(value Value) float64 {
+	var result C.double
+	status := C.napi_get_value_double(env.inner, C.napi_value(value), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return float64(result)
+}
+
+func (env Env) GetValueBigintWords(value Value, signBit *int, wordCount *int, words *uint64) {
+	var cSignBit *C.int
+	if signBit != nil {
+		cSignBit = new(C.int)
+	}
+	var cWordCount C.size_t
+	if wordCount != nil {
+		cWordCount = C.size_t(*wordCount)
+	}
+	status := C.napi_get_value_bigint_words(env.inner, C.napi_value(value), cSignBit, &cWordCount, (*C.uint64_t)(words))
+	if status != C.napi_ok {
+		panic(status)
+	}
+	if signBit != nil {
+		*signBit = int(*cSignBit)
+	}
+	if wordCount != nil {
+		*wordCount = int(cWordCount)
+	}
+}
+
 func (env Env) GetValueString(value Value, buf []byte) int {
 	// TODO: Maybe go ahead and handle allocating the buffer / converting to string?
 	var result C.size_t
