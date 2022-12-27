@@ -1,9 +1,9 @@
 const binding = require('./build/Release/binding');
 console.log(binding);
 
-const tmpl = new binding.Template("name");
+const tmpl = new binding.Template("myname");
 console.log(tmpl);
-tmpl.foo();
-tmpl.foo();
-tmpl.bar();
-tmpl.bar();
+console.log(tmpl.name());
+
+tmpl.parse("foo: {{ . }}")
+console.log(tmpl.execute('hello world'))

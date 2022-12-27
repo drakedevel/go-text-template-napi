@@ -45,6 +45,32 @@ func (env Env) GetValueString(value Value, buf []byte) int {
 	return int(result)
 }
 
+// Working with JavaScript values and abstract operations
+
+type ValueType C.napi_valuetype
+
+const (
+	Undefined ValueType = C.napi_undefined
+	Null      ValueType = C.napi_null
+	Boolean   ValueType = C.napi_boolean
+	Number    ValueType = C.napi_number
+	String    ValueType = C.napi_string
+	Symbol    ValueType = C.napi_symbol
+	Object    ValueType = C.napi_object
+	Function  ValueType = C.napi_function
+	External  ValueType = C.napi_external
+	Bigint    ValueType = C.napi_bigint
+)
+
+func (env Env) Typeof(value Value) ValueType {
+	var result C.napi_valuetype
+	status := C.napi_typeof(env.inner, C.napi_value(value), &result)
+	if status != C.napi_ok {
+		panic(status)
+	}
+	return ValueType(result)
+}
+
 // Working with JavaScript properties
 
 func (env Env) convertPropertyDescriptors(properties []PropertyDescriptor) (C.size_t, *C.napi_property_descriptor) {
