@@ -1,6 +1,7 @@
 package main
 
-// #cgo LDFLAGS: -Wl,--unresolved-symbols=ignore-all
+// #cgo linux LDFLAGS: -Wl,--unresolved-symbols=ignore-all
+// #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 // #include <node_api.h>
 // napi_value Init(napi_env env, napi_value exports);
 // napi_value ExportedFunc(napi_env env, napi_callback_info info);

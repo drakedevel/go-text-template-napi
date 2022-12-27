@@ -14,11 +14,12 @@
     'conditions': [
       # TODO: Other platforms
       ['OS=="linux"', {
-        'ldflags+': [
-          '-Wl,--whole-archive',
-          '<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)',
-          '-Wl,--no-whole-archive'
-        ],
+        'ldflags+': ['-Wl,--whole-archive,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX),--no-whole-archive'],
+      }],
+      ['OS=="mac"', {
+        'xcode_settings': {
+          'OTHER_LDFLAGS+': ['-Wl,-force_load,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)'],
+        },
       }],
     ],
   }],

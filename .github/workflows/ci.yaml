@@ -15,5 +15,6 @@ jobs:
       with:
         node-version: '16'
     - run: npm ci
+    - run: grep -A 15 LDFLAGS build/binding.target.mk
     - name: Verify binding can be require()d
       run: node -r ./build/Release/binding -e ''
