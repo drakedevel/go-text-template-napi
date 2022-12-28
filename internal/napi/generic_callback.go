@@ -6,6 +6,7 @@ package napi
 // void genericNapiFinalize(napi_env env, void* data, void* hint);
 import "C"
 import (
+	"fmt"
 	"runtime/cgo"
 	"unsafe"
 )
@@ -14,8 +15,8 @@ type Callback C.napi_callback
 type CallbackInfo C.napi_callback_info
 type Finalize C.napi_finalize
 
-type callbackFunc func(env Env, value CallbackInfo) Value
-type finalizeFunc func(env Env, data unsafe.Pointer)
+type callbackFunc func(env Env, value CallbackInfo) (Value, error)
+type finalizeFunc func(env Env, data unsafe.Pointer) error
 type cleanupFunc func()
 
 //export genericNapiCallback
@@ -23,8 +24,16 @@ func genericNapiCallback(rawEnv C.napi_env, rawInfo C.napi_callback_info) C.napi
 	env := Env{rawEnv}
 	info := CallbackInfo(rawInfo)
 	var data unsafe.Pointer
-	env.GetCbInfo(info, nil, nil, nil, &data)
-	return C.napi_value(unlaunderHandle(data).Value().(callbackFunc)(env, info))
+	if err := env.GetCbInfo(info, nil, nil, nil, &data); err != nil {
+		env.maybeThrowError(err)
+		return nil
+	}
+	result, err := unlaunderHandle(data).Value().(callbackFunc)(env, info)
+	if err != nil {
+		env.maybeThrowError(err)
+		return nil
+	}
+	return C.napi_value(result)
 }
 
 func MakeNapiCallback(cb callbackFunc) (Callback, unsafe.Pointer, cleanupFunc) {
@@ -33,8 +42,13 @@ func MakeNapiCallback(cb callbackFunc) (Callback, unsafe.Pointer, cleanupFunc) {
 }
 
 //export genericNapiFinalize
-func genericNapiFinalize(env C.napi_env, data unsafe.Pointer, hint unsafe.Pointer) {
-	unlaunderHandle(hint).Value().(finalizeFunc)(Env{env}, data)
+func genericNapiFinalize(rawEnv C.napi_env, data unsafe.Pointer, hint unsafe.Pointer) {
+	env := Env{rawEnv}
+	err := unlaunderHandle(hint).Value().(finalizeFunc)(env, data)
+	if err != nil {
+		// N-API won't propagate an exception from a finalizer, so just log it
+		fmt.Println("Uncaught exception in finalizer:", err)
+	}
 }
 
 func MakeNapiFinalize(cb finalizeFunc) (Finalize, unsafe.Pointer, cleanupFunc) {

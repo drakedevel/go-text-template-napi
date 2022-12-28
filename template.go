@@ -16,47 +16,63 @@ type templateObj struct {
 	inner *template.Template
 }
 
-func (tmpl *templateObj) wrap(env napi.Env, object napi.Value) {
+func (tmpl *templateObj) wrap(env napi.Env, object napi.Value) error {
 	// TODO: Type tagging
 	handle := cgo.NewHandle(tmpl)
 	// TODO: Don't leak finalizeData
 	finalizeCb, finalizeData, _ := napi.MakeNapiFinalize(templateFinalize)
 	// FIXME: Don't use Handle pointer
-	env.Wrap(object, unsafe.Pointer(&handle), finalizeCb, finalizeData)
+	return env.Wrap(object, unsafe.Pointer(&handle), finalizeCb, finalizeData)
 }
 
-func unwrapTemplate(env napi.Env, object napi.Value) *templateObj {
+func unwrapTemplate(env napi.Env, object napi.Value) (*templateObj, error) {
 	// TODO: Type tagging
-	wrapped := env.Unwrap(object)
+	wrapped, err := env.Unwrap(object)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Don't use Handle pointer
 	handle := *(*cgo.Handle)(wrapped)
-	return handle.Value().(*templateObj)
+	return handle.Value().(*templateObj), nil
 }
 
-func extractString(env napi.Env, value napi.Value) string {
+func extractString(env napi.Env, value napi.Value) (string, error) {
 	// Get string length
-	strLen := env.GetValueString(value, nil)
+	strLen, err := env.GetValueString(value, nil)
+	if err != nil {
+		return "", err
+	}
 
 	// Allocate buffer and get string contents
 	buf := make([]byte, strLen+1)
-	strLen = env.GetValueString(value, buf)
-	return string(buf[0:strLen])
+	strLen, err = env.GetValueString(value, buf)
+	if err != nil {
+		return "", err
+	}
+	return string(buf[0:strLen]), nil
 }
 
-func extractBigint(env napi.Env, value napi.Value) *big.Int {
+func extractBigint(env napi.Env, value napi.Value) (*big.Int, error) {
 	// Get length
 	wordCount := 0
-	env.GetValueBigintWords(value, nil, &wordCount, nil)
+	if err := env.GetValueBigintWords(value, nil, &wordCount, nil); err != nil {
+		return nil, err
+	}
 
 	// Allocate space and get contents
 	var signBit int
 	words := make([]uint64, wordCount)
-	env.GetValueBigintWords(value, &signBit, &wordCount, &words[0])
+	if err := env.GetValueBigintWords(value, &signBit, &wordCount, &words[0]); err != nil {
+		return nil, err
+	}
 
 	// Convert to big-endian bytes
 	var buf bytes.Buffer
 	for i := len(words) - 1; i >= 0; i-- {
-		binary.Write(&buf, binary.BigEndian, words[i])
+		err := binary.Write(&buf, binary.BigEndian, words[i])
+		if err != nil {
+			return nil, err
+		}
 	}
 	fmt.Println("Bigint words", words)
 	fmt.Println("Bigint bytes", buf.Bytes())
@@ -66,10 +82,10 @@ func extractBigint(env napi.Env, value napi.Value) *big.Int {
 	if signBit > 0 {
 		result.Neg(result)
 	}
-	return result
+	return result, nil
 }
 
-func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (this *templateObj, args []napi.Value) {
+func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value, []napi.Value, error) {
 	var thisArg napi.Value
 	argc := nArgs
 	argv := make([]napi.Value, argc)
@@ -77,56 +93,77 @@ func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (this 
 	if argc > 0 {
 		argvPtr = &argv[0]
 	}
-	env.GetCbInfo(info, &argc, argvPtr, &thisArg, nil)
-	if argc != nArgs {
-		// TODO: Throw
-		panic("wrong argument count")
+	if err := env.GetCbInfo(info, &argc, argvPtr, &thisArg, nil); err != nil {
+		return nil, nil, err
+	}
+	return thisArg, argv, nil
+}
+
+func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*templateObj, []napi.Value, error) {
+	thisArg, argv, err := callbackEntry(env, info, nArgs)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// Retrieve wrapped native object from JS object
-	return unwrapTemplate(env, thisArg), argv
+	this, err := unwrapTemplate(env, thisArg)
+	if err != nil {
+		return nil, nil, err
+	}
+	return this, argv, nil
 }
 
-type templateMethodFunc func(napi.Env, *templateObj, []napi.Value) napi.Value
+type templateMethodFunc func(napi.Env, *templateObj, []napi.Value) (napi.Value, error)
 
 func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int) (napi.Callback, unsafe.Pointer, func()) {
-	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) napi.Value {
-		this, args := templateMethodEntry(env, info, nArgs)
+	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
+		this, args, err := templateMethodEntry(env, info, nArgs)
+		if err != nil {
+			return nil, err
+		}
 		return fn(env, this, args)
 	})
 }
 
-func buildTemplateClass(env napi.Env) napi.Value {
+func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	// Build property descriptors
+	type method struct {
+		fn    templateMethodFunc
+		nArgs int
+	}
+	methods := map[string]method{
+		// TODO: AddParseTree?
+		// TODO: Clone
+		// TODO: DefinedTemplates?
+		// TODO: Delims
+		"execute":         method{templateMethodExecute, 1},
+		"executeTemplate": method{templateMethodExecuteTemplate, 2},
+		// TODO: Funcs
+		// TODO: Lookup
+		"name": method{templateMethodName, 0},
+		// TODO: New
+		// TODO: Option
+		"parse": method{templateMethodParse, 1},
+		// TODO: ParseFS
+		// TODO: ParseFiles
+		// TODO: ParseGlob
+		// TODO: Templates
+	}
 	var propDescs []napi.PropertyDescriptor
-
-	addMethod := func(name string, fn templateMethodFunc, nArgs int) {
+	for name, spec := range methods {
 		// TODO: Don't leak cbData
-		cb, cbData, _ := makeTemplateMethodCallback(fn, nArgs)
+		cb, cbData, _ := makeTemplateMethodCallback(spec.fn, spec.nArgs)
+		nameObj, err := env.CreateString(name)
+		if err != nil {
+			return nil, err
+		}
 		propDescs = append(propDescs, napi.PropertyDescriptor{
-			Name:       env.CreateString(name),
+			Name:       nameObj,
 			Method:     cb,
 			Attributes: napi.DefaultMethod,
 			Data:       cbData,
 		})
 	}
-
-	// TODO: AddParseTree?
-	// TODO: Clone
-	// TODO: DefinedTemplates?
-	// TODO: Delims
-	addMethod("execute", templateMethodExecute, 1)
-	addMethod("executeTemplate", templateMethodExecuteTemplate, 2)
-	// TODO: Funcs
-	// TODO: Lookup
-	addMethod("name", templateMethodName, 0)
-	// TODO: New
-	// TODO: Option
-	addMethod("parse", templateMethodParse, 1)
-	// TODO: ParseFS
-	// TODO: ParseFiles
-	// TODO: ParseGlob
-	// TODO: Templates
 
 	// Define class
 	// TODO: Don't leak consData
@@ -134,35 +171,41 @@ func buildTemplateClass(env napi.Env) napi.Value {
 	return env.DefineClass("Template", consCb, consData, propDescs)
 }
 
-func templateConstructor(env napi.Env, info napi.CallbackInfo) napi.Value {
-	argc := 1
-	argv := make([]napi.Value, 1)
-	var thisArg napi.Value
-	env.GetCbInfo(info, &argc, &argv[0], &thisArg, nil)
-	if argc != 1 {
-		// TODO: Throw
-		panic("expected an argument")
+func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
+	// TODO: Add check for new.target
+	thisArg, argv, err := callbackEntry(env, info, 1)
+	if err != nil {
+		return nil, err
+	}
+	name, err := extractString(env, argv[0])
+	if err != nil {
+		return nil, err
 	}
 
 	// Create native object and attach to JS object
-	data := templateObj{template.New(extractString(env, argv[0]))}
-	data.wrap(env, thisArg)
-
-	return nil
+	data := templateObj{template.New(name)}
+	if err := data.wrap(env, thisArg); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
-func templateFinalize(env napi.Env, data unsafe.Pointer) {
+func templateFinalize(env napi.Env, data unsafe.Pointer) error {
 	fmt.Printf("In Template finalize\n")
 	handle := *(*cgo.Handle)(data)
 	handle.Delete()
+	return nil
 }
 
-func convertTemplateData(env napi.Env, value napi.Value) interface{} {
-	valueType := env.Typeof(value)
+func convertTemplateData(env napi.Env, value napi.Value) (interface{}, error) {
+	valueType, err := env.Typeof(value)
+	if err != nil {
+		return nil, err
+	}
 	switch valueType {
 	case napi.Undefined, napi.Null:
 		// TODO: Filter out Undefined from parent object, keep Null
-		return nil
+		return nil, nil
 	case napi.Boolean:
 		return env.GetValueBool(value)
 	case napi.Number:
@@ -170,73 +213,125 @@ func convertTemplateData(env napi.Env, value napi.Value) interface{} {
 	case napi.String:
 		return extractString(env, value)
 	case napi.Object:
-		if env.IsArray(value) {
-			length := env.GetArrayLength(value)
+		isArray, err := env.IsArray(value)
+		if err != nil {
+			return nil, err
+		}
+		if isArray {
+			length, err := env.GetArrayLength(value)
+			if err != nil {
+				return nil, err
+			}
 			result := make([]interface{}, length)
 			var i uint32
 			for i = 0; i < length; i++ {
 				// TODO: Scope?
-				result[i] = convertTemplateData(env, env.GetElement(value, i))
+				elt, err := env.GetElement(value, i)
+				if err != nil {
+					return nil, err
+				}
+				eltConv, err := convertTemplateData(env, elt)
+				if err != nil {
+					return nil, err
+				}
+				result[i] = eltConv
 			}
-			return result
+			return result, nil
 		} else {
 			// TODO: Should any other object types get special handling?
-			propNames := env.GetAllPropertyNames(value, napi.KeyOwnOnly, napi.KeySkipSymbols, napi.KeyNumbersToStrings)
-			length := env.GetArrayLength(propNames)
+			propNames, err := env.GetAllPropertyNames(value, napi.KeyOwnOnly, napi.KeySkipSymbols, napi.KeyNumbersToStrings)
+			if err != nil {
+				return nil, err
+			}
+			length, err := env.GetArrayLength(propNames)
+			if err != nil {
+				return nil, err
+			}
 			result := map[string]interface{}{}
 			var i uint32
 			for i = 0; i < length; i++ {
 				// TODO: Scope?
-				key := env.GetElement(propNames, i)
-				result[extractString(env, key)] = convertTemplateData(env, env.GetProperty(value, key))
+				key, err := env.GetElement(propNames, i)
+				if err != nil {
+					return nil, err
+				}
+				keyStr, err := extractString(env, key)
+				if err != nil {
+					return nil, err
+				}
+				elt, err := env.GetProperty(value, key)
+				if err != nil {
+					return nil, err
+				}
+				eltConv, err := convertTemplateData(env, elt)
+				if err != nil {
+					return nil, err
+				}
+				result[keyStr] = eltConv
 			}
-			return result
+			return result, nil
 		}
 	case napi.Bigint:
 		return extractBigint(env, value)
-	case napi.External, napi.Function, napi.Symbol:
-		// No useful way to map these to Go types
-		panic("unsupported value type")
 	default:
-		fmt.Printf("unsupported type %v\n", valueType)
-		panic("unknown value type")
+		// No useful way to map these to Go types
+		// TODO: More useful error message?
+		err = env.ThrowTypeError("ERR_INVALID_ARG_TYPE", "Unsupported value type")
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("threw exception")
 	}
 }
 
-func templateMethodExecute(env napi.Env, this *templateObj, args []napi.Value) napi.Value {
+func templateMethodExecute(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
-	var buf bytes.Buffer
-	err := this.inner.Execute(&buf, convertTemplateData(env, args[0]))
+	data, err := convertTemplateData(env, args[0])
 	if err != nil {
-		// TODO: Throw
-		panic(err)
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err := this.inner.Execute(&buf, data); err != nil {
+		// TODO: Map to better JS error?
+		return nil, err
 	}
 	return env.CreateString(buf.String())
 }
 
-func templateMethodExecuteTemplate(env napi.Env, this *templateObj, args []napi.Value) napi.Value {
+func templateMethodExecuteTemplate(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
-	var buf bytes.Buffer
-	err := this.inner.ExecuteTemplate(&buf, extractString(env, args[0]), convertTemplateData(env, args[1]))
+	name, err := extractString(env, args[0])
 	if err != nil {
-		// TODO: Throw
-		panic(err)
+		return nil, err
+	}
+	data, err := convertTemplateData(env, args[1])
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err := this.inner.ExecuteTemplate(&buf, name, data); err != nil {
+		// TODO: Map to better JS error?
+		return nil, err
 	}
 	return env.CreateString(buf.String())
 }
 
-func templateMethodName(env napi.Env, this *templateObj, args []napi.Value) napi.Value {
+func templateMethodName(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
 	return env.CreateString(this.inner.Name())
 }
 
-func templateMethodParse(env napi.Env, this *templateObj, args []napi.Value) napi.Value {
-	result, err := this.inner.Parse(extractString(env, args[0]))
+func templateMethodParse(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
+	text, err := extractString(env, args[0])
 	if err != nil {
-		// TODO: Throw
-		panic(err)
+		return nil, err
+	}
+	result, err := this.inner.Parse(text)
+	if err != nil {
+		// TODO: Map to better JS error?
+		return nil, err
 	}
 	if result != this.inner {
 		panic("Expected Parse to return itself")
 	}
-	return nil // XXX: Should return this
+	return nil, nil // XXX: Should return this
 }

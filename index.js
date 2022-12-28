@@ -22,4 +22,6 @@ console.log(tmpl2.execute({
    num2: 1.5,
    num3: 9007199254740993n,
    num4: 18446744073709551618n,
+   num5: -18446744073709551618n,
+   //sym: Symbol('sym')
 }));
