@@ -56,18 +56,6 @@ func MakeNapiFinalize(cb finalizeFunc) (Finalize, unsafe.Pointer, cleanupFunc) {
 	return Finalize(C.genericNapiFinalize), ptr, cleanup
 }
 
-func WrapObject(env Env, jsObject Value, goObject interface{}) error {
-	handle := cgo.NewHandle(goObject)
-	goPtr, goCleanup := launderHandle(handle)
-	var finalizeCleanup cleanupFunc
-	finalizeCb, finalizePtr, finalizeCleanup := MakeNapiFinalize(func(env Env, data unsafe.Pointer) error {
-		goCleanup()
-		finalizeCleanup()
-		return nil
-	})
-	return env.Wrap(jsObject, goPtr, finalizeCb, finalizePtr)
-}
-
 func launderHandle(handle cgo.Handle) (unsafe.Pointer, cleanupFunc) {
 	result := unsafe.Pointer(C.malloc(C.size_t(unsafe.Sizeof(uintptr(0)))))
 	*((*uintptr)(result)) = uintptr(handle)

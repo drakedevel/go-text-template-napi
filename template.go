@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"runtime/cgo"
 	"text/template"
 	"unsafe"
 
@@ -16,20 +15,7 @@ type templateObj struct {
 	inner *template.Template
 }
 
-func (tmpl *templateObj) wrap(env napi.Env, object napi.Value) error {
-	// TODO: Type tagging
-	return napi.WrapObject(env, object, tmpl)
-}
-
-func unwrapTemplate(env napi.Env, object napi.Value) (*templateObj, error) {
-	// TODO: Type tagging
-	wrapped, err := env.Unwrap(object)
-	if err != nil {
-		return nil, err
-	}
-	handle := cgo.Handle(*(*uintptr)(wrapped))
-	return handle.Value().(*templateObj), nil
-}
+var templateWrapper = napi.NewSafeWrapper[templateObj](0x1b339336b7154e7d, 0xa8cd781754bef7c9)
 
 func extractString(env napi.Env, value napi.Value) (string, error) {
 	// Get string length
@@ -69,8 +55,6 @@ func extractBigint(env napi.Env, value napi.Value) (*big.Int, error) {
 			return nil, err
 		}
 	}
-	fmt.Println("Bigint words", words)
-	fmt.Println("Bigint bytes", buf.Bytes())
 
 	result := new(big.Int)
 	result.SetBytes(buf.Bytes())
@@ -101,7 +85,7 @@ func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*temp
 	}
 
 	// Retrieve wrapped native object from JS object
-	this, err := unwrapTemplate(env, thisArg)
+	this, err := templateWrapper.Unwrap(env, thisArg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -179,7 +163,7 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 
 	// Create native object and attach to JS object
 	data := templateObj{template.New(name)}
-	if err := data.wrap(env, thisArg); err != nil {
+	if err := templateWrapper.Wrap(env, thisArg, &data); err != nil {
 		return nil, err
 	}
 	return nil, nil

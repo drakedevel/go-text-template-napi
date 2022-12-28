@@ -336,3 +336,19 @@ func (env Env) Unwrap(jsObject Value) (unsafe.Pointer, error) {
 	}
 	return result, nil
 }
+
+type TypeTag C.napi_type_tag
+
+func (env Env) TypeTagObject(jsObject Value, typeTag *TypeTag) error {
+	status := C.napi_type_tag_object(env.inner, C.napi_value(jsObject), (*C.napi_type_tag)(typeTag))
+	return env.mapStatus(status)
+}
+
+func (env Env) CheckObjectTypeTag(jsObject Value, typeTag *TypeTag) (bool, error) {
+	var result C.bool
+	status := C.napi_check_object_type_tag(env.inner, C.napi_value(jsObject), (*C.napi_type_tag)(typeTag), &result)
+	if err := env.mapStatus(status); err != nil {
+		return false, err
+	}
+	return bool(result), nil
+}
