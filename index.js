@@ -34,3 +34,16 @@ console.log(tmpl3.execute({foo: 'foo'}));
 const tmpl4 = tmpl3.new('test4');
 tmpl4.parse('<< template "test3" . >> / bar: << .bar >>')
 console.log(tmpl4.execute({foo: 'foo', bar: 'bar'}));
+
+const tmpl5 = new binding.Template("test5");
+tmpl5.funcs({foo: () => {console.log('in func'); return {key: 'success!'};}});
+tmpl5.parse('{{ foo }}{{ "bar" | foo}}');
+console.log(tmpl5.execute({}));
+
+const tmpl6a = new binding.Template("test6a");
+const tmpl6b = new binding.Template("test6b");
+tmpl6a.funcs({foo: () => {console.log('in foo'); return `foo: ${tmpl6b.execute({})}`;}});
+tmpl6b.funcs({bar: () => {console.log('in bar'); return `bar`;}});
+tmpl6a.parse(`6a: {{ foo }}`);
+tmpl6b.parse(`6b: {{ bar }}`);
+console.log(tmpl6a.execute({}));

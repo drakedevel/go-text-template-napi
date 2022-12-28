@@ -113,12 +113,12 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		"delims":          {templateMethodDelims, 2},
 		"execute":         {templateMethodExecute, 1},
 		"executeTemplate": {templateMethodExecuteTemplate, 2},
-		// TODO: Funcs
-		"lookup": {templateMethodLookup, 1},
-		"name":   {templateMethodName, 0},
-		"new":    {templateMethodNew, 1},
-		"option": {templateMethodOption, 1},
-		"parse":  {templateMethodParse, 1},
+		"funcs":           {templateMethodFuncs, 1},
+		"lookup":          {templateMethodLookup, 1},
+		"name":            {templateMethodName, 0},
+		"new":             {templateMethodNew, 1},
+		"option":          {templateMethodOption, 1},
+		"parse":           {templateMethodParse, 1},
 		// TODO: ParseFS?
 		// TODO: ParseFiles
 		// TODO: ParseGlob
@@ -306,6 +306,12 @@ func templateMethodExecute(env napi.Env, this *template.Template, args []napi.Va
 	if err != nil {
 		return nil, err
 	}
+	modData, err := getInstanceData(env)
+	if err != nil {
+		return nil, err
+	}
+	modData.envStack.Enter(env)
+	defer modData.envStack.Exit(env)
 	var buf bytes.Buffer
 	if err := this.Execute(&buf, data); err != nil {
 		// TODO: Map to better JS error?
@@ -324,12 +330,93 @@ func templateMethodExecuteTemplate(env napi.Env, this *template.Template, args [
 	if err != nil {
 		return nil, err
 	}
+	modData, err := getInstanceData(env)
+	if err != nil {
+		return nil, err
+	}
+	modData.envStack.Enter(env)
+	defer modData.envStack.Exit(env)
 	var buf bytes.Buffer
 	if err := this.ExecuteTemplate(&buf, name, data); err != nil {
 		// TODO: Map to better JS error?
 		return nil, err
 	}
 	return env.CreateString(buf.String())
+}
+
+func makeJsCallback(envStack *envStack, jsFnRef napi.Ref) interface{} {
+	return func(args ...interface{}) (interface{}, error) {
+		// FIXME: Pass args
+		env := envStack.Current()
+		jsFn, err := env.GetReferenceValue(jsFnRef)
+		if err != nil {
+			return nil, err
+		}
+		undefVal, err := env.GetUndefined()
+		if err != nil {
+			return nil, err
+		}
+		result, err := env.CallFunction(undefVal, jsFn, nil)
+		if err != nil {
+			return nil, err
+		}
+		return convertTemplateData(env, result)
+	}
+}
+
+func templateMethodFuncs(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+	modData, err := getInstanceData(env)
+	if err != nil {
+		return nil, err
+	}
+	propNames, err := env.GetPropertyNames(args[0])
+	if err != nil {
+		return nil, err
+	}
+	length, err := env.GetArrayLength(propNames)
+	if err != nil {
+		return nil, err
+	}
+	funcMap := make(template.FuncMap)
+	for i := uint32(0); i < length; i++ {
+		// TODO: Scope?
+		propNameValue, err := env.GetElement(propNames, i)
+		if err != nil {
+			return nil, err
+		}
+		propName, err := extractString(env, propNameValue)
+		if err != nil {
+			return nil, err
+		}
+		propValue, err := env.GetProperty(args[0], propNameValue)
+		if err != nil {
+			return nil, err
+		}
+		propType, err := env.Typeof(propValue)
+		if err != nil {
+			return nil, err
+		}
+		if propType == napi.Undefined {
+			continue
+		}
+		if propType != napi.Function {
+			// TODO: Custom error mechanism
+			excMsg := fmt.Sprintf("Key '%s' is not a function", propName)
+			err = env.ThrowTypeError("ERR_INVALID_ARG_TYPE", excMsg)
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("threw exception")
+		}
+		// TODO: Don't leak propRef
+		propRef, err := env.CreateReference(propValue, 1)
+		if err != nil {
+			return nil, err
+		}
+		funcMap[propName] = makeJsCallback(&modData.envStack, propRef)
+	}
+	this.Funcs(funcMap)
+	return nil, nil // XXX: Should return this
 }
 
 func templateMethodLookup(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {

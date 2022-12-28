@@ -8,6 +8,7 @@ import (
 
 type moduleData struct {
 	templateConstructor napi.Ref
+	envStack            envStack
 }
 
 func getInstanceData(env napi.Env) (*moduleData, error) {
@@ -47,7 +48,7 @@ func moduleInit(env napi.Env, exports napi.Value) (napi.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	modData := moduleData{clsRef}
+	modData := moduleData{clsRef, newEnvStack()}
 	if err := napi.SetInstanceData(env, &modData); err != nil {
 		return nil, err
 	}

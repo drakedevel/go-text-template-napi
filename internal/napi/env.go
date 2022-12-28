@@ -153,15 +153,6 @@ func (env Env) GetReferenceValue(ref Ref) (Value, error) {
 
 // Working with JavaScript values
 
-func (env Env) CreateFunction(name string, data unsafe.Pointer, cb Callback) (Value, error) {
-	var result C.napi_value
-	status := C.NapiCreateFunction(env.inner, name, cb, data, &result)
-	if err := env.mapStatus(status); err != nil {
-		return nil, err
-	}
-	return Value(result), nil
-}
-
 func (env Env) CreateString(str string) (Value, error) {
 	var result C.napi_value
 	status := C.NapiCreateString(env.inner, str, &result)
@@ -235,6 +226,15 @@ func (env Env) GetValueString(value Value, buf []byte) (int, error) {
 	return int(result), nil
 }
 
+func (env Env) GetUndefined() (Value, error) {
+	var result C.napi_value
+	status := C.napi_get_undefined(env.inner, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
 // Working with JavaScript values and abstract operations
 
 type ValueType C.napi_valuetype
@@ -291,6 +291,15 @@ const (
 	KeyNumbersToStrings KeyConversion = C.napi_key_numbers_to_strings
 )
 
+func (env Env) GetPropertyNames(object Value) (Value, error) {
+	var result C.napi_value
+	status := C.napi_get_property_names(env.inner, object, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
 func (env Env) GetAllPropertyNames(object Value, keyMode KeyCollectionMode, keyFilter KeyFilter, keyConversion KeyConversion) (Value, error) {
 	var result C.napi_value
 	status := C.napi_get_all_property_names(
@@ -343,6 +352,28 @@ func (env Env) DefineProperties(object Value, properties []PropertyDescriptor) e
 }
 
 // Working with JavaScript functions
+
+func (env Env) CallFunction(recv Value, fun Value, argv []Value) (Value, error) {
+	var result C.napi_value
+	var cArgv *C.napi_value
+	if len(argv) > 0 {
+		cArgv = (*C.napi_value)(&argv[0])
+	}
+	status := C.napi_call_function(env.inner, recv, fun, C.size_t(len(argv)), cArgv, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
+func (env Env) CreateFunction(name string, data unsafe.Pointer, cb Callback) (Value, error) {
+	var result C.napi_value
+	status := C.NapiCreateFunction(env.inner, name, cb, data, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
 
 func (env Env) GetCbInfo(cbinfo CallbackInfo, argc *int, argv *Value, thisArg *Value, data *unsafe.Pointer) error {
 	// TODO: Consider interface that returns, instead of outparams
