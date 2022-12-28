@@ -29,4 +29,8 @@ console.log(tmpl2.execute({
 const tmpl3 = new binding.Template("test3");
 tmpl3.delims("<<", ">>");
 tmpl3.parse("foo: << .foo >>");
-console.log(tmpl3.execute({foo: 'bar'}));
+console.log(tmpl3.execute({foo: 'foo'}));
+
+const tmpl4 = tmpl3.new('test4');
+tmpl4.parse('<< template "test3" . >> / bar: << .bar >>')
+console.log(tmpl4.execute({foo: 'foo', bar: 'bar'}));

@@ -51,9 +51,23 @@ func genericNapiFinalize(rawEnv C.napi_env, data unsafe.Pointer, hint unsafe.Poi
 	}
 }
 
+// TODO: Re-evaluate this API
 func MakeNapiFinalize(cb finalizeFunc) (Finalize, unsafe.Pointer, cleanupFunc) {
 	ptr, cleanup := launderHandle(cgo.NewHandle(cb))
 	return Finalize(C.genericNapiFinalize), ptr, cleanup
+}
+
+func makeDataAndFinalize(data interface{}) (unsafe.Pointer, Finalize, unsafe.Pointer) {
+	handle := cgo.NewHandle(data)
+	dataPtr, dataCleanup := launderHandle(handle)
+	var finalizeCleanup cleanupFunc
+	finalizeCb, finalizePtr, finalizeCleanup := MakeNapiFinalize(func(env Env, data unsafe.Pointer) error {
+		dataCleanup()
+		finalizeCleanup()
+		return nil
+	})
+	return dataPtr, finalizeCb, finalizePtr
+
 }
 
 func launderHandle(handle cgo.Handle) (unsafe.Pointer, cleanupFunc) {

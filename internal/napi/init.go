@@ -29,3 +29,16 @@ func SetModuleInit(init func(env Env, exports Value) (Value, error)) {
 	}
 	registeredInitFunc = init
 }
+
+func SetInstanceData(env Env, data interface{}) error {
+	ptr, finalize, finalizeHint := makeDataAndFinalize(data)
+	return env.SetInstanceData(ptr, finalize, finalizeHint)
+}
+
+func GetInstanceData(env Env) (interface{}, error) {
+	ptr, err := env.GetInstanceData()
+	if err != nil {
+		return nil, err
+	}
+	return unlaunderHandle(ptr).Value(), nil
+}

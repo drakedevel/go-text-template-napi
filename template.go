@@ -60,7 +60,7 @@ func extractBigint(env napi.Env, value napi.Value) (*big.Int, error) {
 	return result, nil
 }
 
-func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value, []napi.Value, error) {
+func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value, int, []napi.Value, error) {
 	var thisArg napi.Value
 	argc := nArgs
 	argv := make([]napi.Value, argc)
@@ -69,13 +69,13 @@ func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value,
 		argvPtr = &argv[0]
 	}
 	if err := env.GetCbInfo(info, &argc, argvPtr, &thisArg, nil); err != nil {
-		return nil, nil, err
+		return nil, 0, nil, err
 	}
-	return thisArg, argv, nil
+	return thisArg, argc, argv, nil
 }
 
 func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*template.Template, []napi.Value, error) {
-	thisArg, argv, err := callbackEntry(env, info, nArgs)
+	thisArg, _, argv, err := callbackEntry(env, info, nArgs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,7 +83,7 @@ func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*temp
 	// Retrieve wrapped native object from JS object
 	this, err := templateWrapper.Unwrap(env, thisArg)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("object not correctly initialized: %w", err)
 	}
 	return this, argv, nil
 }
@@ -108,15 +108,15 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	}
 	methods := map[string]method{
 		// TODO: AddParseTree?
-		// TODO: Clone
-		// TODO: DefinedTemplates?
+		"clone": {templateMethodClone, 0},
+		// TODO: DefinedTemplates
 		"delims":          {templateMethodDelims, 2},
 		"execute":         {templateMethodExecute, 1},
 		"executeTemplate": {templateMethodExecuteTemplate, 2},
 		// TODO: Funcs
-		// TODO: Lookup
-		"name": {templateMethodName, 0},
-		// TODO: New
+		"lookup": {templateMethodLookup, 1},
+		"name":   {templateMethodName, 0},
+		"new":    {templateMethodNew, 1},
 		"option": {templateMethodOption, 1},
 		"parse":  {templateMethodParse, 1},
 		// TODO: ParseFS?
@@ -148,10 +148,18 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 
 func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
 	// TODO: Add check for new.target
-	thisArg, argv, err := callbackEntry(env, info, 1)
+	thisArg, argc, argv, err := callbackEntry(env, info, 1)
 	if err != nil {
 		return nil, err
 	}
+
+	// If no name was passed in, skip wrapping this object, and assume we'll
+	// wrap it later with wrapExistingTemplate (e.g. in Clone).
+	// TODO: Find way to give JS an error while allowing Clone/etc.
+	if argc == 0 {
+		return nil, err
+	}
+
 	name, err := extractString(env, argv[0])
 	if err != nil {
 		return nil, err
@@ -163,6 +171,33 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 		return nil, err
 	}
 	return nil, nil
+}
+
+func wrapExistingTemplate(env napi.Env, tmpl *template.Template) (napi.Value, error) {
+	instData, err := getInstanceData(env)
+	if err != nil {
+		return nil, err
+	}
+	constructor, err := env.GetReferenceValue(instData.templateConstructor)
+	if err != nil {
+		return nil, err
+	}
+	instance, err := env.NewInstance(constructor, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := templateWrapper.Wrap(env, instance, tmpl); err != nil {
+		return nil, err
+	}
+	return instance, nil
+}
+
+func templateMethodClone(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+	cloned, err := this.Clone()
+	if err != nil {
+		return nil, err
+	}
+	return wrapExistingTemplate(env, cloned)
 }
 
 func templateMethodDelims(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
@@ -297,8 +332,28 @@ func templateMethodExecuteTemplate(env napi.Env, this *template.Template, args [
 	return env.CreateString(buf.String())
 }
 
+func templateMethodLookup(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+	name, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	result := this.Lookup(name)
+	if result == nil {
+		return nil, nil
+	}
+	return wrapExistingTemplate(env, result)
+}
+
 func templateMethodName(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
 	return env.CreateString(this.Name())
+}
+
+func templateMethodNew(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+	name, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	return wrapExistingTemplate(env, this.New(name))
 }
 
 func templateMethodOption(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {

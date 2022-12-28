@@ -5,7 +5,6 @@ import "C"
 import (
 	"fmt"
 	"runtime/cgo"
-	"unsafe"
 )
 
 type SafeWrapper[T any] struct {
@@ -18,15 +17,8 @@ func NewSafeWrapper[T any](tag1 uint64, tag2 uint64) SafeWrapper[T] {
 
 func (sfw *SafeWrapper[T]) Wrap(env Env, jsObject Value, goObject *T) error {
 	// Wrap the object
-	handle := cgo.NewHandle(goObject)
-	goPtr, goCleanup := launderHandle(handle)
-	var finalizeCleanup cleanupFunc
-	finalizeCb, finalizePtr, finalizeCleanup := MakeNapiFinalize(func(env Env, data unsafe.Pointer) error {
-		goCleanup()
-		finalizeCleanup()
-		return nil
-	})
-	err := env.Wrap(jsObject, goPtr, finalizeCb, finalizePtr)
+	data, finalize, finalizeHint := makeDataAndFinalize(goObject)
+	err := env.Wrap(jsObject, data, finalize, finalizeHint)
 	if err != nil {
 		return err
 	}
@@ -42,7 +34,7 @@ func (sfw *SafeWrapper[T]) Unwrap(env Env, jsObject Value) (*T, error) {
 		return nil, err
 	}
 	if !tagOk {
-		return nil, fmt.Errorf("tried to unwrap object with incorrect type tag")
+		return nil, fmt.Errorf("missing or invalid type tag")
 	}
 
 	// Unwrap the object

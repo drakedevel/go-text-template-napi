@@ -15,6 +15,22 @@ type Env struct {
 	inner C.napi_env
 }
 
+// Environment life cycle APIs
+
+func (env Env) SetInstanceData(data unsafe.Pointer, finalizeCb Finalize, finalizeHint unsafe.Pointer) error {
+	status := C.napi_set_instance_data(env.inner, data, C.napi_finalize(finalizeCb), finalizeHint)
+	return env.mapStatus(status)
+}
+
+func (env Env) GetInstanceData() (unsafe.Pointer, error) {
+	var result unsafe.Pointer
+	status := C.napi_get_instance_data(env.inner, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // Error handling
 
 type ExtendedErrorInfo struct {
@@ -70,7 +86,7 @@ func (env Env) IsExceptionPending() (bool, error) {
 }
 
 func (env Env) FatalException(errValue Value) error {
-	return env.mapStatus(C.napi_fatal_exception(env.inner, C.napi_value(errValue)))
+	return env.mapStatus(C.napi_fatal_exception(env.inner, errValue))
 }
 
 func (env Env) mapStatus(status C.napi_status) error {
@@ -100,6 +116,41 @@ func (env Env) maybeThrowError(err error) {
 	}
 }
 
+// Object lifecycle management
+
+type Ref C.napi_ref
+
+func (env Env) CreateReference(value Value, initialRefcount uint32) (Ref, error) {
+	var result C.napi_ref
+	status := C.napi_create_reference(env.inner, value, C.uint32_t(initialRefcount), &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Ref(result), nil
+}
+
+func (env Env) DeleteReference(ref Ref) error {
+	return env.mapStatus(C.napi_delete_reference(env.inner, ref))
+}
+
+func (env Env) ReferenceUnref(ref Ref) (uint32, error) {
+	var result C.uint32_t
+	status := C.napi_reference_unref(env.inner, ref, &result)
+	if err := env.mapStatus(status); err != nil {
+		return 0, err
+	}
+	return uint32(result), nil
+}
+
+func (env Env) GetReferenceValue(ref Ref) (Value, error) {
+	var result C.napi_value
+	status := C.napi_get_reference_value(env.inner, ref, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
 // Working with JavaScript values
 
 func (env Env) CreateFunction(name string, data unsafe.Pointer, cb Callback) (Value, error) {
@@ -122,7 +173,7 @@ func (env Env) CreateString(str string) (Value, error) {
 
 func (env Env) GetArrayLength(value Value) (uint32, error) {
 	var result C.uint32_t
-	status := C.napi_get_array_length(env.inner, C.napi_value(value), &result)
+	status := C.napi_get_array_length(env.inner, value, &result)
 	if err := env.mapStatus(status); err != nil {
 		return 0, err
 	}
@@ -131,7 +182,7 @@ func (env Env) GetArrayLength(value Value) (uint32, error) {
 
 func (env Env) GetValueBool(value Value) (bool, error) {
 	var result C.bool
-	status := C.napi_get_value_bool(env.inner, C.napi_value(value), &result)
+	status := C.napi_get_value_bool(env.inner, value, &result)
 	if err := env.mapStatus(status); err != nil {
 		return false, err
 	}
@@ -140,7 +191,7 @@ func (env Env) GetValueBool(value Value) (bool, error) {
 
 func (env Env) GetValueDouble(value Value) (float64, error) {
 	var result C.double
-	status := C.napi_get_value_double(env.inner, C.napi_value(value), &result)
+	status := C.napi_get_value_double(env.inner, value, &result)
 	if err := env.mapStatus(status); err != nil {
 		return 0, err
 	}
@@ -156,7 +207,7 @@ func (env Env) GetValueBigintWords(value Value, signBit *int, wordCount *int, wo
 	if wordCount != nil {
 		cWordCount = C.size_t(*wordCount)
 	}
-	status := C.napi_get_value_bigint_words(env.inner, C.napi_value(value), cSignBit, &cWordCount, (*C.uint64_t)(words))
+	status := C.napi_get_value_bigint_words(env.inner, value, cSignBit, &cWordCount, (*C.uint64_t)(words))
 	if err := env.mapStatus(status); err != nil {
 		return err
 	}
@@ -177,7 +228,7 @@ func (env Env) GetValueString(value Value, buf []byte) (int, error) {
 		bufPtr = (*C.char)(unsafe.Pointer(&buf[0]))
 	}
 
-	status := C.napi_get_value_string_utf8(env.inner, C.napi_value(value), bufPtr, C.size_t(len(buf)), &result)
+	status := C.napi_get_value_string_utf8(env.inner, value, bufPtr, C.size_t(len(buf)), &result)
 	if err := env.mapStatus(status); err != nil {
 		return 0, err
 	}
@@ -203,7 +254,7 @@ const (
 
 func (env Env) Typeof(value Value) (ValueType, error) {
 	var result C.napi_valuetype
-	status := C.napi_typeof(env.inner, C.napi_value(value), &result)
+	status := C.napi_typeof(env.inner, value, &result)
 	if err := env.mapStatus(status); err != nil {
 		return 0, err
 	}
@@ -212,7 +263,7 @@ func (env Env) Typeof(value Value) (ValueType, error) {
 
 func (env Env) IsArray(value Value) (bool, error) {
 	var result C.bool
-	status := C.napi_is_array(env.inner, C.napi_value(value), &result)
+	status := C.napi_is_array(env.inner, value, &result)
 	if err := env.mapStatus(status); err != nil {
 		return false, err
 	}
@@ -244,7 +295,7 @@ func (env Env) GetAllPropertyNames(object Value, keyMode KeyCollectionMode, keyF
 	var result C.napi_value
 	status := C.napi_get_all_property_names(
 		env.inner,
-		C.napi_value(object),
+		object,
 		C.napi_key_collection_mode(keyMode),
 		C.napi_key_filter(keyFilter),
 		C.napi_key_conversion(keyConversion),
@@ -258,7 +309,7 @@ func (env Env) GetAllPropertyNames(object Value, keyMode KeyCollectionMode, keyF
 
 func (env Env) GetProperty(object Value, key Value) (Value, error) {
 	var result C.napi_value
-	status := C.napi_get_property(env.inner, C.napi_value(object), C.napi_value(key), &result)
+	status := C.napi_get_property(env.inner, object, key, &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -267,7 +318,7 @@ func (env Env) GetProperty(object Value, key Value) (Value, error) {
 
 func (env Env) GetElement(object Value, index uint32) (Value, error) {
 	var result C.napi_value
-	status := C.napi_get_element(env.inner, C.napi_value(object), C.uint32_t(index), &result)
+	status := C.napi_get_element(env.inner, object, C.uint32_t(index), &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -300,7 +351,7 @@ func (env Env) GetCbInfo(cbinfo CallbackInfo, argc *int, argv *Value, thisArg *V
 		nativeArgc = C.size_t(*argc)
 	}
 
-	status := C.napi_get_cb_info(env.inner, C.napi_callback_info(cbinfo), &nativeArgc, (*C.napi_value)(argv), (*C.napi_value)(thisArg), data)
+	status := C.napi_get_cb_info(env.inner, cbinfo, &nativeArgc, (*C.napi_value)(argv), (*C.napi_value)(thisArg), data)
 	if err := env.mapStatus(status); err != nil {
 		return err
 	}
@@ -308,6 +359,19 @@ func (env Env) GetCbInfo(cbinfo CallbackInfo, argc *int, argv *Value, thisArg *V
 		*argc = int(nativeArgc)
 	}
 	return nil
+}
+
+func (env Env) NewInstance(cons Value, argv []Value) (Value, error) {
+	var result C.napi_value
+	var cArgv *C.napi_value
+	if len(argv) > 0 {
+		cArgv = (*C.napi_value)(&argv[0])
+	}
+	status := C.napi_new_instance(env.inner, cons, C.size_t(len(argv)), cArgv, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
 }
 
 // Object wrap
@@ -324,13 +388,13 @@ func (env Env) DefineClass(name string, constructor Callback, data unsafe.Pointe
 
 func (env Env) Wrap(jsObject Value, nativeObject unsafe.Pointer, finalizeCb Finalize, finalizeHint unsafe.Pointer) error {
 	// TODO: Optionally return result?
-	status := C.napi_wrap(env.inner, C.napi_value(jsObject), nativeObject, C.napi_finalize(finalizeCb), finalizeHint, nil)
+	status := C.napi_wrap(env.inner, jsObject, nativeObject, finalizeCb, finalizeHint, nil)
 	return env.mapStatus(status)
 }
 
 func (env Env) Unwrap(jsObject Value) (unsafe.Pointer, error) {
 	var result unsafe.Pointer
-	status := C.napi_unwrap(env.inner, C.napi_value(jsObject), &result)
+	status := C.napi_unwrap(env.inner, jsObject, &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -340,13 +404,13 @@ func (env Env) Unwrap(jsObject Value) (unsafe.Pointer, error) {
 type TypeTag C.napi_type_tag
 
 func (env Env) TypeTagObject(jsObject Value, typeTag *TypeTag) error {
-	status := C.napi_type_tag_object(env.inner, C.napi_value(jsObject), (*C.napi_type_tag)(typeTag))
+	status := C.napi_type_tag_object(env.inner, jsObject, (*C.napi_type_tag)(typeTag))
 	return env.mapStatus(status)
 }
 
 func (env Env) CheckObjectTypeTag(jsObject Value, typeTag *TypeTag) (bool, error) {
 	var result C.bool
-	status := C.napi_check_object_type_tag(env.inner, C.napi_value(jsObject), (*C.napi_type_tag)(typeTag), &result)
+	status := C.napi_check_object_type_tag(env.inner, jsObject, (*C.napi_type_tag)(typeTag), &result)
 	if err := env.mapStatus(status); err != nil {
 		return false, err
 	}
