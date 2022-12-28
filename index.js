@@ -25,3 +25,8 @@ console.log(tmpl2.execute({
    num5: -18446744073709551618n,
    //sym: Symbol('sym')
 }));
+
+const tmpl3 = new binding.Template("test3");
+tmpl3.delims("<<", ">>");
+tmpl3.parse("foo: << .foo >>");
+console.log(tmpl3.execute({foo: 'bar'}));

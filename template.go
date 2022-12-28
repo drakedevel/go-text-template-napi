@@ -114,16 +114,16 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		// TODO: AddParseTree?
 		// TODO: Clone
 		// TODO: DefinedTemplates?
-		// TODO: Delims
-		"execute":         method{templateMethodExecute, 1},
-		"executeTemplate": method{templateMethodExecuteTemplate, 2},
+		"delims":          {templateMethodDelims, 2},
+		"execute":         {templateMethodExecute, 1},
+		"executeTemplate": {templateMethodExecuteTemplate, 2},
 		// TODO: Funcs
 		// TODO: Lookup
-		"name": method{templateMethodName, 0},
+		"name": {templateMethodName, 0},
 		// TODO: New
-		// TODO: Option
-		"parse": method{templateMethodParse, 1},
-		// TODO: ParseFS
+		"option": {templateMethodOption, 1},
+		"parse":  {templateMethodParse, 1},
+		// TODO: ParseFS?
 		// TODO: ParseFiles
 		// TODO: ParseGlob
 		// TODO: Templates
@@ -167,6 +167,19 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 		return nil, err
 	}
 	return nil, nil
+}
+
+func templateMethodDelims(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
+	left, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	right, err := extractString(env, args[1])
+	if err != nil {
+		return nil, err
+	}
+	this.inner.Delims(left, right)
+	return nil, nil // XXX: Should return this
 }
 
 func convertTemplateData(env napi.Env, value napi.Value) (interface{}, error) {
@@ -290,6 +303,16 @@ func templateMethodExecuteTemplate(env napi.Env, this *templateObj, args []napi.
 
 func templateMethodName(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
 	return env.CreateString(this.inner.Name())
+}
+
+func templateMethodOption(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
+	// XXX: Should be variadic
+	option, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	this.inner.Option(option)
+	return nil, nil // XXX: Should return this
 }
 
 func templateMethodParse(env napi.Env, this *templateObj, args []napi.Value) (napi.Value, error) {
