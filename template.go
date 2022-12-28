@@ -18,11 +18,7 @@ type templateObj struct {
 
 func (tmpl *templateObj) wrap(env napi.Env, object napi.Value) error {
 	// TODO: Type tagging
-	handle := cgo.NewHandle(tmpl)
-	// TODO: Don't leak finalizeData
-	finalizeCb, finalizeData, _ := napi.MakeNapiFinalize(templateFinalize)
-	// FIXME: Don't use Handle pointer
-	return env.Wrap(object, unsafe.Pointer(&handle), finalizeCb, finalizeData)
+	return napi.WrapObject(env, object, tmpl)
 }
 
 func unwrapTemplate(env napi.Env, object napi.Value) (*templateObj, error) {
@@ -31,8 +27,7 @@ func unwrapTemplate(env napi.Env, object napi.Value) (*templateObj, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Don't use Handle pointer
-	handle := *(*cgo.Handle)(wrapped)
+	handle := cgo.Handle(*(*uintptr)(wrapped))
 	return handle.Value().(*templateObj), nil
 }
 
@@ -188,13 +183,6 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 		return nil, err
 	}
 	return nil, nil
-}
-
-func templateFinalize(env napi.Env, data unsafe.Pointer) error {
-	fmt.Printf("In Template finalize\n")
-	handle := *(*cgo.Handle)(data)
-	handle.Delete()
-	return nil
 }
 
 func convertTemplateData(env napi.Env, value napi.Value) (interface{}, error) {
