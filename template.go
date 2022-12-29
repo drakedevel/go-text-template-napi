@@ -150,29 +150,29 @@ func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value,
 	return thisArg, argc, argv, nil
 }
 
-func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*jsTemplate, []napi.Value, error) {
-	thisArg, _, argv, err := callbackEntry(env, info, nArgs)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Retrieve wrapped native object from JS object
-	this, err := templateWrapper.Unwrap(env, thisArg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("object not correctly initialized: %w", err)
-	}
-	return this, argv, nil
-}
-
 type templateMethodFunc func(*jsTemplate, napi.Env, []napi.Value) (napi.Value, error)
 
-func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int) (napi.Callback, unsafe.Pointer, func()) {
+func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int, chain bool) (napi.Callback, unsafe.Pointer, func()) {
 	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
-		this, args, err := templateMethodEntry(env, info, nArgs)
+		thisArg, _, argv, err := callbackEntry(env, info, nArgs)
 		if err != nil {
 			return nil, err
 		}
-		return fn(this, env, args)
+
+		// Retrieve wrapped native object from JS object
+		this, err := templateWrapper.Unwrap(env, thisArg)
+		if err != nil {
+			return nil, fmt.Errorf("object not correctly initialized: %w", err)
+		}
+
+		result, err := fn(this, env, argv)
+		if err != nil {
+			return nil, err
+		}
+		if chain {
+			result = thisArg
+		}
+		return result, nil
 	})
 }
 
@@ -181,28 +181,29 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	type method struct {
 		fn    templateMethodFunc
 		nArgs int
+		chain bool
 	}
 	methods := map[string]method{
 		// AddParseTree and ParseFS are unsupported
-		"clone":            {(*jsTemplate).methodClone, 0},
-		"definedTemplates": {(*jsTemplate).methodDefinedTemplates, 0},
-		"delims":           {(*jsTemplate).methodDelims, 2},
-		"execute":          {(*jsTemplate).methodExecute, 1},
-		"executeTemplate":  {(*jsTemplate).methodExecuteTemplate, 2},
-		"funcs":            {(*jsTemplate).methodFuncs, 1},
-		"lookup":           {(*jsTemplate).methodLookup, 1},
-		"name":             {(*jsTemplate).methodName, 0},
-		"new":              {(*jsTemplate).methodNew, 1},
-		"option":           {(*jsTemplate).methodOption, 1},
-		"parse":            {(*jsTemplate).methodParse, 1},
+		"clone":            {(*jsTemplate).methodClone, 0, false},
+		"definedTemplates": {(*jsTemplate).methodDefinedTemplates, 0, false},
+		"delims":           {(*jsTemplate).methodDelims, 2, true},
+		"execute":          {(*jsTemplate).methodExecute, 1, false},
+		"executeTemplate":  {(*jsTemplate).methodExecuteTemplate, 2, false},
+		"funcs":            {(*jsTemplate).methodFuncs, 1, true},
+		"lookup":           {(*jsTemplate).methodLookup, 1, false},
+		"name":             {(*jsTemplate).methodName, 0, false},
+		"new":              {(*jsTemplate).methodNew, 1, false},
+		"option":           {(*jsTemplate).methodOption, 1, true},
+		"parse":            {(*jsTemplate).methodParse, 1, true},
 		// TODO: ParseFiles
 		// TODO: ParseGlob
-		"templates": {(*jsTemplate).methodTemplates, 0},
+		"templates": {(*jsTemplate).methodTemplates, 0, false},
 	}
 	var propDescs []napi.PropertyDescriptor
 	for name, spec := range methods {
 		// TODO: Don't leak cbData
-		cb, cbData, _ := makeTemplateMethodCallback(spec.fn, spec.nArgs)
+		cb, cbData, _ := makeTemplateMethodCallback(spec.fn, spec.nArgs, spec.chain)
 		nameObj, err := env.CreateString(name)
 		if err != nil {
 			return nil, err
@@ -313,7 +314,7 @@ func (jst *jsTemplate) methodDelims(env napi.Env, args []napi.Value) (napi.Value
 		return nil, err
 	}
 	jst.inner.Delims(left, right)
-	return nil, nil // XXX: Should return this
+	return nil, nil
 }
 
 func (jst *jsTemplate) methodExecute(env napi.Env, args []napi.Value) (napi.Value, error) {
@@ -460,7 +461,7 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 		}
 	}
 
-	return nil, nil // XXX: Should return this
+	return nil, nil
 }
 
 func (jst *jsTemplate) methodLookup(env napi.Env, args []napi.Value) (napi.Value, error) {
@@ -494,7 +495,7 @@ func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value
 		return nil, err
 	}
 	jst.inner.Option(option)
-	return nil, nil // XXX: Should return this
+	return nil, nil
 }
 
 func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value, error) {
@@ -510,7 +511,7 @@ func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value,
 	if result != jst.inner {
 		panic("Expected Parse to return itself")
 	}
-	return nil, nil // XXX: Should return this
+	return nil, nil
 }
 
 func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Value, error) {
