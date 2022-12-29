@@ -30,8 +30,8 @@ func SetModuleInit(init func(env Env, exports Value) (Value, error)) {
 	registeredInitFunc = init
 }
 
-func SetInstanceData(env Env, data interface{}) error {
-	ptr, finalize, finalizeHint := makeDataAndFinalize(data)
+func SetInstanceData(env Env, data interface{}, finalizeFunc finalizeFunc) error {
+	ptr, finalize, finalizeHint := makeDataAndFinalize(data, finalizeFunc)
 	return env.SetInstanceData(ptr, finalize, finalizeHint)
 }
 

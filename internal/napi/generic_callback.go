@@ -16,7 +16,7 @@ type CallbackInfo C.napi_callback_info
 type Finalize C.napi_finalize
 
 type callbackFunc func(env Env, value CallbackInfo) (Value, error)
-type finalizeFunc func(env Env, data unsafe.Pointer) error
+type finalizeFunc func(env Env, data interface{}) error
 type cleanupFunc func()
 
 //export genericNapiCallback
@@ -44,30 +44,20 @@ func MakeNapiCallback(cb callbackFunc) (Callback, unsafe.Pointer, cleanupFunc) {
 //export genericNapiFinalize
 func genericNapiFinalize(rawEnv C.napi_env, data unsafe.Pointer, hint unsafe.Pointer) {
 	env := Env{rawEnv}
-	err := unlaunderHandle(hint).Value().(finalizeFunc)(env, data)
-	if err != nil {
+	dataHandle := unlaunderHandle(data)
+	hintHandle := unlaunderHandle(hint)
+	if err := hintHandle.Value().(finalizeFunc)(env, dataHandle.Value()); err != nil {
 		// N-API won't propagate an exception from a finalizer, so just log it
 		fmt.Println("Uncaught exception in finalizer:", err)
 	}
+	deleteLaunderedHandle(data)
+	deleteLaunderedHandle(hint)
 }
 
-// TODO: Re-evaluate this API
-func MakeNapiFinalize(cb finalizeFunc) (Finalize, unsafe.Pointer, cleanupFunc) {
-	ptr, cleanup := launderHandle(cgo.NewHandle(cb))
-	return Finalize(C.genericNapiFinalize), ptr, cleanup
-}
-
-func makeDataAndFinalize(data interface{}) (unsafe.Pointer, Finalize, unsafe.Pointer) {
-	handle := cgo.NewHandle(data)
-	dataPtr, dataCleanup := launderHandle(handle)
-	var finalizeCleanup cleanupFunc
-	finalizeCb, finalizePtr, finalizeCleanup := MakeNapiFinalize(func(env Env, data unsafe.Pointer) error {
-		dataCleanup()
-		finalizeCleanup()
-		return nil
-	})
-	return dataPtr, finalizeCb, finalizePtr
-
+func makeDataAndFinalize(data interface{}, finalize finalizeFunc) (unsafe.Pointer, Finalize, unsafe.Pointer) {
+	dataPtr, _ := launderHandle(cgo.NewHandle(data))
+	hintPtr, _ := launderHandle(cgo.NewHandle(finalize))
+	return dataPtr, Finalize(C.genericNapiFinalize), hintPtr
 }
 
 func launderHandle(handle cgo.Handle) (unsafe.Pointer, cleanupFunc) {

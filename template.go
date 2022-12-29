@@ -12,6 +12,30 @@ import (
 )
 
 type templateAssn struct {
+	refs uint
+}
+
+func (ta *templateAssn) Clone() (*templateAssn, error) {
+	return new(templateAssn), nil
+}
+
+func (ta *templateAssn) Ref(jst *jsTemplate) {
+	if jst.assn != nil {
+		panic("Tried to associate template with multiple associations")
+	}
+	ta.refs++
+	jst.assn = ta
+}
+
+func (ta *templateAssn) Unref(jst *jsTemplate) {
+	if ta.refs == 0 {
+		panic("Tried to unreference template association with 0 references")
+	}
+	if jst.assn != ta {
+		panic("Tried to unreference template from wrong association")
+	}
+	jst.assn = nil
+	ta.refs--
 }
 
 type jsTemplate struct {
@@ -153,6 +177,18 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	return env.DefineClass("Template", consCb, consData, propDescs)
 }
 
+func wrapTemplateObject(env napi.Env, object napi.Value, tmpl *template.Template, assn *templateAssn) error {
+	jst := &jsTemplate{tmpl, nil}
+	if err := templateWrapper.Wrap(env, object, jst, templateFinalize); err != nil {
+		return err
+	}
+	// Wait until after wrapping succeeds to reference the association to
+	// ensure the finalizer will be called.
+	assn.Ref(jst)
+	fmt.Printf("wrapped Template(%s), assn now has refcount %d\n", jst.inner.Name(), jst.assn.refs)
+	return nil
+}
+
 func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
 	// TODO: Add check for new.target
 	thisArg, argc, argv, err := callbackEntry(env, info, 1)
@@ -174,14 +210,22 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 
 	// Create native object and attach to JS object
 	// TODO: Initialize Assn fields
-	data := jsTemplate{template.New(name), new(templateAssn)}
-	if err := templateWrapper.Wrap(env, thisArg, &data); err != nil {
+	if err := wrapTemplateObject(env, thisArg, template.New(name), new(templateAssn)); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func wrapExistingTemplate(env napi.Env, tmpl *template.Template) (napi.Value, error) {
+func templateFinalize(env napi.Env, data interface{}) error {
+	jst := data.(*jsTemplate)
+	if jst.assn != nil {
+		fmt.Printf("in template %s finalize, assn refcount is %d\n", jst.inner.Name(), jst.assn.refs)
+		jst.assn.Unref(jst)
+	}
+	return nil
+}
+
+func wrapExistingTemplate(env napi.Env, tmpl *template.Template, assn *templateAssn) (napi.Value, error) {
 	instData, err := getInstanceData(env)
 	if err != nil {
 		return nil, err
@@ -194,20 +238,22 @@ func wrapExistingTemplate(env napi.Env, tmpl *template.Template) (napi.Value, er
 	if err != nil {
 		return nil, err
 	}
-	// FIXME: Propagate association
-	data := jsTemplate{tmpl, new(templateAssn)}
-	if err := templateWrapper.Wrap(env, instance, &data); err != nil {
+	if err := wrapTemplateObject(env, instance, tmpl, assn); err != nil {
 		return nil, err
 	}
 	return instance, nil
 }
 
 func (jst *jsTemplate) methodClone(env napi.Env, args []napi.Value) (napi.Value, error) {
-	cloned, err := jst.inner.Clone()
+	clonedTmpl, err := jst.inner.Clone()
 	if err != nil {
 		return nil, err
 	}
-	return wrapExistingTemplate(env, cloned)
+	clonedAssn, err := jst.assn.Clone()
+	if err != nil {
+		return nil, err
+	}
+	return wrapExistingTemplate(env, clonedTmpl, clonedAssn)
 }
 
 func (jst *jsTemplate) methodDefinedTemplates(env napi.Env, args []napi.Value) (napi.Value, error) {
@@ -311,7 +357,9 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 	if err != nil {
 		return nil, err
 	}
-	funcMap := make(template.FuncMap)
+	// Create references for all passed-in functions
+	// TODO: Leaks if errors occcur part-way through this loop
+	refMap := make(map[string]napi.Ref)
 	for i := uint32(0); i < length; i++ {
 		// TODO: Scope?
 		propNameValue, err := env.GetElement(propNames, i)
@@ -342,12 +390,18 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 			}
 			return nil, fmt.Errorf("threw exception")
 		}
-		// TODO: Don't leak propRef
 		propRef, err := env.CreateReference(propValue, 1)
 		if err != nil {
 			return nil, err
 		}
-		funcMap[propName] = makeJsCallback(&modData.envStack, propRef)
+		refMap[propName] = propRef
+	}
+
+	// Create closures to pass to Funcs
+	funcMap := make(template.FuncMap)
+	for name, ref := range refMap {
+		// TODO: Attach references to association to prevent leak
+		funcMap[name] = makeJsCallback(&modData.envStack, ref)
 	}
 	jst.inner.Funcs(funcMap)
 	return nil, nil // XXX: Should return this
@@ -362,7 +416,7 @@ func (jst *jsTemplate) methodLookup(env napi.Env, args []napi.Value) (napi.Value
 	if result == nil {
 		return nil, nil
 	}
-	return wrapExistingTemplate(env, result)
+	return wrapExistingTemplate(env, result, jst.assn)
 }
 
 func (jst *jsTemplate) methodName(env napi.Env, args []napi.Value) (napi.Value, error) {
@@ -374,7 +428,7 @@ func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, e
 	if err != nil {
 		return nil, err
 	}
-	return wrapExistingTemplate(env, jst.inner.New(name))
+	return wrapExistingTemplate(env, jst.inner.New(name), jst.assn)
 }
 
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
@@ -410,7 +464,7 @@ func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Va
 		return nil, err
 	}
 	for i, template := range templates {
-		wrapped, err := wrapExistingTemplate(env, template)
+		wrapped, err := wrapExistingTemplate(env, template, jst.assn)
 		if err != nil {
 			return nil, err
 		}

@@ -19,8 +19,17 @@ func getInstanceData(env napi.Env) (*moduleData, error) {
 	return raw.(*moduleData), nil
 }
 
+func moduleTeardown(env napi.Env, data interface{}) error {
+	fmt.Println("In N-API module teardown")
+	modData := data.(*moduleData)
+	if err := env.DeleteReference(modData.templateConstructor); err != nil {
+		return err
+	}
+	return nil
+}
+
 func moduleInit(env napi.Env, exports napi.Value) (napi.Value, error) {
-	fmt.Printf("In N-API module Init\n")
+	fmt.Println("In N-API module init")
 
 	var propDescs []napi.PropertyDescriptor
 
@@ -42,16 +51,18 @@ func moduleInit(env napi.Env, exports napi.Value) (napi.Value, error) {
 		return nil, err
 	}
 
+	// Attach an object for "global" state to this instance of the module
+	modData := moduleData{nil, newEnvStack()}
+	if err := napi.SetInstanceData(env, &modData, moduleTeardown); err != nil {
+		return nil, err
+	}
+
 	// Create a reference to the Template class and save it in the module data
-	// TODO: Don't leak clsRef
 	clsRef, err := env.CreateReference(clsValue, 1)
 	if err != nil {
 		return nil, err
 	}
-	modData := moduleData{clsRef, newEnvStack()}
-	if err := napi.SetInstanceData(env, &modData); err != nil {
-		return nil, err
-	}
+	modData.templateConstructor = clsRef
 
 	return exports, nil
 }

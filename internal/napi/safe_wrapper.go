@@ -15,9 +15,9 @@ func NewSafeWrapper[T any](tag1 uint64, tag2 uint64) SafeWrapper[T] {
 	return SafeWrapper[T]{TypeTag{C.uint64_t(tag1), C.uint64_t(tag2)}}
 }
 
-func (sfw *SafeWrapper[T]) Wrap(env Env, jsObject Value, goObject *T) error {
+func (sfw *SafeWrapper[T]) Wrap(env Env, jsObject Value, goObject *T, finalizeFunc finalizeFunc) error {
 	// Wrap the object
-	data, finalize, finalizeHint := makeDataAndFinalize(goObject)
+	data, finalize, finalizeHint := makeDataAndFinalize(goObject, finalizeFunc)
 	err := env.Wrap(jsObject, data, finalize, finalizeHint)
 	if err != nil {
 		return err
