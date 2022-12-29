@@ -136,25 +136,36 @@ func extractBigint(env napi.Env, value napi.Value) (*big.Int, error) {
 	return result, nil
 }
 
-func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value, int, []napi.Value, error) {
-	var thisArg napi.Value
-	argc := nArgs
+func callbackEntry(env napi.Env, info napi.CallbackInfo, minArgs int) (napi.Value, []napi.Value, error) {
+	// Get argument count
+	argc := 0
+	if err := env.GetCbInfo(info, &argc, nil, nil, nil); err != nil {
+		return nil, nil, err
+	}
+
+	// If missing required arguments, pad the slice so we get undefined values
+	if argc < minArgs {
+		argc = minArgs
+	}
 	argv := make([]napi.Value, argc)
+
+	// Fetch thisArg and all arguments
+	var thisArg napi.Value
 	var argvPtr *napi.Value
-	if argc > 0 {
+	if len(argv) > 0 {
 		argvPtr = &argv[0]
 	}
 	if err := env.GetCbInfo(info, &argc, argvPtr, &thisArg, nil); err != nil {
-		return nil, 0, nil, err
+		return nil, nil, err
 	}
-	return thisArg, argc, argv, nil
+	return thisArg, argv, nil
 }
 
 type templateMethodFunc func(*jsTemplate, napi.Env, []napi.Value) (napi.Value, error)
 
-func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int, chain bool) (napi.Callback, unsafe.Pointer, func()) {
+func makeTemplateMethodCallback(fn templateMethodFunc, minArgs int, chain bool) (napi.Callback, unsafe.Pointer, func()) {
 	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
-		thisArg, _, argv, err := callbackEntry(env, info, nArgs)
+		thisArg, args, err := callbackEntry(env, info, minArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +176,7 @@ func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int, chain bool) (n
 			return nil, fmt.Errorf("object not correctly initialized: %w", err)
 		}
 
-		result, err := fn(this, env, argv)
+		result, err := fn(this, env, args)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +191,7 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	// Build property descriptors
 	type method struct {
 		fn    templateMethodFunc
-		nArgs int
+		minArgs int
 		chain bool
 	}
 	methods := map[string]method{
@@ -194,16 +205,16 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		"lookup":           {(*jsTemplate).methodLookup, 1, false},
 		"name":             {(*jsTemplate).methodName, 0, false},
 		"new":              {(*jsTemplate).methodNew, 1, false},
-		"option":           {(*jsTemplate).methodOption, 1, true}, // XXX variadic
+		"option":           {(*jsTemplate).methodOption, 0, true},
 		"parse":            {(*jsTemplate).methodParse, 1, true},
-		"parseFiles":       {(*jsTemplate).methodParseFiles, 1, true}, // XXX variadic
+		"parseFiles":       {(*jsTemplate).methodParseFiles, 0, true},
 		"parseGlob":        {(*jsTemplate).methodParseGlob, 1, true},
 		"templates":        {(*jsTemplate).methodTemplates, 0, false},
 	}
 	var propDescs []napi.PropertyDescriptor
 	for name, spec := range methods {
 		// TODO: Don't leak cbData
-		cb, cbData, _ := makeTemplateMethodCallback(spec.fn, spec.nArgs, spec.chain)
+		cb, cbData, _ := makeTemplateMethodCallback(spec.fn, spec.minArgs, spec.chain)
 		nameObj, err := env.CreateString(name)
 		if err != nil {
 			return nil, err
@@ -235,7 +246,7 @@ func wrapTemplateObject(env napi.Env, object napi.Value, tmpl *template.Template
 
 func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
 	// TODO: Add check for new.target
-	thisArg, argc, argv, err := callbackEntry(env, info, 1)
+	thisArg, argv, err := callbackEntry(env, info, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +254,7 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 	// If no name was passed in, skip wrapping this object, and assume we'll
 	// wrap it later with wrapExistingTemplate (e.g. in Clone).
 	// TODO: Find way to give JS an error while allowing Clone/etc.
-	if argc == 0 {
+	if len(argv) == 0 {
 		return nil, err
 	}
 
@@ -489,12 +500,15 @@ func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, e
 }
 
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
-	// XXX: Should be variadic
-	option, err := extractString(env, args[0])
-	if err != nil {
-		return nil, err
+	options := make([]string, len(args))
+	for i, arg := range args {
+		option, err := extractString(env, arg)
+		if err != nil {
+			return nil, err
+		}
+		options[i] = option
 	}
-	jst.inner.Option(option)
+	jst.inner.Option(options...)
 	return nil, nil
 }
 
@@ -512,12 +526,15 @@ func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value,
 }
 
 func (jst *jsTemplate) methodParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
-	// XXX: Should be variadic
-	text, err := extractString(env, args[0])
-	if err != nil {
-		return nil, err
+	files := make([]string, len(args))
+	for i, arg := range args {
+		option, err := extractString(env, arg)
+		if err != nil {
+			return nil, err
+		}
+		files[i] = option
 	}
-	if _, err := jst.inner.ParseFiles(text); err != nil {
+	if _, err := jst.inner.ParseFiles(files...); err != nil {
 		// TODO: Map to better JS error?
 		return nil, err
 	}
