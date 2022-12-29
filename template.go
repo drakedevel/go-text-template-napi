@@ -11,7 +11,15 @@ import (
 	"github.com/drakedevel/go-text-template-napi/internal/napi"
 )
 
-var templateWrapper = napi.NewSafeWrapper[template.Template](0x1b339336b7154e7d, 0xa8cd781754bef7c9)
+type templateAssn struct {
+}
+
+type jsTemplate struct {
+	inner *template.Template
+	assn  *templateAssn
+}
+
+var templateWrapper = napi.NewSafeWrapper[jsTemplate](0x1b339336b7154e7d, 0xa8cd781754bef7c9)
 
 func extractString(env napi.Env, value napi.Value) (string, error) {
 	// Get string length
@@ -74,7 +82,7 @@ func callbackEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (napi.Value,
 	return thisArg, argc, argv, nil
 }
 
-func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*template.Template, []napi.Value, error) {
+func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*jsTemplate, []napi.Value, error) {
 	thisArg, _, argv, err := callbackEntry(env, info, nArgs)
 	if err != nil {
 		return nil, nil, err
@@ -88,7 +96,7 @@ func templateMethodEntry(env napi.Env, info napi.CallbackInfo, nArgs int) (*temp
 	return this, argv, nil
 }
 
-type templateMethodFunc func(napi.Env, *template.Template, []napi.Value) (napi.Value, error)
+type templateMethodFunc func(*jsTemplate, napi.Env, []napi.Value) (napi.Value, error)
 
 func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int) (napi.Callback, unsafe.Pointer, func()) {
 	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
@@ -96,7 +104,7 @@ func makeTemplateMethodCallback(fn templateMethodFunc, nArgs int) (napi.Callback
 		if err != nil {
 			return nil, err
 		}
-		return fn(env, this, args)
+		return fn(this, env, args)
 	})
 }
 
@@ -108,20 +116,20 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	}
 	methods := map[string]method{
 		// AddParseTree and ParseFS are unsupported
-		"clone":            {templateMethodClone, 0},
-		"definedTemplates": {templateMethodDefinedTemplates, 0},
-		"delims":           {templateMethodDelims, 2},
-		"execute":          {templateMethodExecute, 1},
-		"executeTemplate":  {templateMethodExecuteTemplate, 2},
-		"funcs":            {templateMethodFuncs, 1},
-		"lookup":           {templateMethodLookup, 1},
-		"name":             {templateMethodName, 0},
-		"new":              {templateMethodNew, 1},
-		"option":           {templateMethodOption, 1},
-		"parse":            {templateMethodParse, 1},
+		"clone":            {(*jsTemplate).methodClone, 0},
+		"definedTemplates": {(*jsTemplate).methodDefinedTemplates, 0},
+		"delims":           {(*jsTemplate).methodDelims, 2},
+		"execute":          {(*jsTemplate).methodExecute, 1},
+		"executeTemplate":  {(*jsTemplate).methodExecuteTemplate, 2},
+		"funcs":            {(*jsTemplate).methodFuncs, 1},
+		"lookup":           {(*jsTemplate).methodLookup, 1},
+		"name":             {(*jsTemplate).methodName, 0},
+		"new":              {(*jsTemplate).methodNew, 1},
+		"option":           {(*jsTemplate).methodOption, 1},
+		"parse":            {(*jsTemplate).methodParse, 1},
 		// TODO: ParseFiles
 		// TODO: ParseGlob
-		"templates": {templateMethodTemplates, 0},
+		"templates": {(*jsTemplate).methodTemplates, 0},
 	}
 	var propDescs []napi.PropertyDescriptor
 	for name, spec := range methods {
@@ -165,8 +173,9 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 	}
 
 	// Create native object and attach to JS object
-	data := template.New(name)
-	if err := templateWrapper.Wrap(env, thisArg, data); err != nil {
+	// TODO: Initialize Assn fields
+	data := jsTemplate{template.New(name), new(templateAssn)}
+	if err := templateWrapper.Wrap(env, thisArg, &data); err != nil {
 		return nil, err
 	}
 	return nil, nil
@@ -185,25 +194,27 @@ func wrapExistingTemplate(env napi.Env, tmpl *template.Template) (napi.Value, er
 	if err != nil {
 		return nil, err
 	}
-	if err := templateWrapper.Wrap(env, instance, tmpl); err != nil {
+	// FIXME: Propagate association
+	data := jsTemplate{tmpl, new(templateAssn)}
+	if err := templateWrapper.Wrap(env, instance, &data); err != nil {
 		return nil, err
 	}
 	return instance, nil
 }
 
-func templateMethodClone(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
-	cloned, err := this.Clone()
+func (jst *jsTemplate) methodClone(env napi.Env, args []napi.Value) (napi.Value, error) {
+	cloned, err := jst.inner.Clone()
 	if err != nil {
 		return nil, err
 	}
 	return wrapExistingTemplate(env, cloned)
 }
 
-func templateMethodDefinedTemplates(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
-	return env.CreateString(this.DefinedTemplates())
+func (jst *jsTemplate) methodDefinedTemplates(env napi.Env, args []napi.Value) (napi.Value, error) {
+	return env.CreateString(jst.inner.DefinedTemplates())
 }
 
-func templateMethodDelims(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodDelims(env napi.Env, args []napi.Value) (napi.Value, error) {
 	left, err := extractString(env, args[0])
 	if err != nil {
 		return nil, err
@@ -212,11 +223,11 @@ func templateMethodDelims(env napi.Env, this *template.Template, args []napi.Val
 	if err != nil {
 		return nil, err
 	}
-	this.Delims(left, right)
+	jst.inner.Delims(left, right)
 	return nil, nil // XXX: Should return this
 }
 
-func templateMethodExecute(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodExecute(env napi.Env, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
 	data, err := jsValueToGo(env, args[0])
 	if err != nil {
@@ -229,14 +240,14 @@ func templateMethodExecute(env napi.Env, this *template.Template, args []napi.Va
 	modData.envStack.Enter(env)
 	defer modData.envStack.Exit(env)
 	var buf bytes.Buffer
-	if err := this.Execute(&buf, data); err != nil {
+	if err := jst.inner.Execute(&buf, data); err != nil {
 		// TODO: Map to better JS error?
 		return nil, err
 	}
 	return env.CreateString(buf.String())
 }
 
-func templateMethodExecuteTemplate(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodExecuteTemplate(env napi.Env, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
 	name, err := extractString(env, args[0])
 	if err != nil {
@@ -253,7 +264,7 @@ func templateMethodExecuteTemplate(env napi.Env, this *template.Template, args [
 	modData.envStack.Enter(env)
 	defer modData.envStack.Exit(env)
 	var buf bytes.Buffer
-	if err := this.ExecuteTemplate(&buf, name, data); err != nil {
+	if err := jst.inner.ExecuteTemplate(&buf, name, data); err != nil {
 		// TODO: Map to better JS error?
 		return nil, err
 	}
@@ -287,7 +298,7 @@ func makeJsCallback(envStack *envStack, jsFnRef napi.Ref) interface{} {
 	}
 }
 
-func templateMethodFuncs(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value, error) {
 	modData, err := getInstanceData(env)
 	if err != nil {
 		return nil, err
@@ -338,62 +349,62 @@ func templateMethodFuncs(env napi.Env, this *template.Template, args []napi.Valu
 		}
 		funcMap[propName] = makeJsCallback(&modData.envStack, propRef)
 	}
-	this.Funcs(funcMap)
+	jst.inner.Funcs(funcMap)
 	return nil, nil // XXX: Should return this
 }
 
-func templateMethodLookup(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodLookup(env napi.Env, args []napi.Value) (napi.Value, error) {
 	name, err := extractString(env, args[0])
 	if err != nil {
 		return nil, err
 	}
-	result := this.Lookup(name)
+	result := jst.inner.Lookup(name)
 	if result == nil {
 		return nil, nil
 	}
 	return wrapExistingTemplate(env, result)
 }
 
-func templateMethodName(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
-	return env.CreateString(this.Name())
+func (jst *jsTemplate) methodName(env napi.Env, args []napi.Value) (napi.Value, error) {
+	return env.CreateString(jst.inner.Name())
 }
 
-func templateMethodNew(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, error) {
 	name, err := extractString(env, args[0])
 	if err != nil {
 		return nil, err
 	}
-	return wrapExistingTemplate(env, this.New(name))
+	return wrapExistingTemplate(env, jst.inner.New(name))
 }
 
-func templateMethodOption(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
 	// XXX: Should be variadic
 	option, err := extractString(env, args[0])
 	if err != nil {
 		return nil, err
 	}
-	this.Option(option)
+	jst.inner.Option(option)
 	return nil, nil // XXX: Should return this
 }
 
-func templateMethodParse(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value, error) {
 	text, err := extractString(env, args[0])
 	if err != nil {
 		return nil, err
 	}
-	result, err := this.Parse(text)
+	result, err := jst.inner.Parse(text)
 	if err != nil {
 		// TODO: Map to better JS error?
 		return nil, err
 	}
-	if result != this {
+	if result != jst.inner {
 		panic("Expected Parse to return itself")
 	}
 	return nil, nil // XXX: Should return this
 }
 
-func templateMethodTemplates(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
-	templates := this.Templates()
+func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Value, error) {
+	templates := jst.inner.Templates()
 	result, err := env.CreateArrayWithLength(len(templates))
 	if err != nil {
 		return nil, err
