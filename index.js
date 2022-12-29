@@ -47,7 +47,7 @@ tmpl6b.funcs({bar: () => {console.log('in bar'); return `bar`;}});
 tmpl6a.parse(`6a: {{ foo }}`);
 tmpl6b.parse(`6b: {{ bar }}`);
 console.log(tmpl6a.execute({}));
-
+console.log(tmpl6a.definedTemplates(), tmpl6a.templates().map(t => t.name()))
 
 const tmpl7 = new binding.Template("test7")
 tmpl7.funcs({f(...args) { return `in JS: ${JSON.stringify(args)}`; }})

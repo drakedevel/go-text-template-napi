@@ -107,22 +107,21 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		nArgs int
 	}
 	methods := map[string]method{
-		// TODO: AddParseTree?
-		"clone": {templateMethodClone, 0},
-		// TODO: DefinedTemplates
-		"delims":          {templateMethodDelims, 2},
-		"execute":         {templateMethodExecute, 1},
-		"executeTemplate": {templateMethodExecuteTemplate, 2},
-		"funcs":           {templateMethodFuncs, 1},
-		"lookup":          {templateMethodLookup, 1},
-		"name":            {templateMethodName, 0},
-		"new":             {templateMethodNew, 1},
-		"option":          {templateMethodOption, 1},
-		"parse":           {templateMethodParse, 1},
-		// TODO: ParseFS?
+		// AddParseTree and ParseFS are unsupported
+		"clone":            {templateMethodClone, 0},
+		"definedTemplates": {templateMethodDefinedTemplates, 0},
+		"delims":           {templateMethodDelims, 2},
+		"execute":          {templateMethodExecute, 1},
+		"executeTemplate":  {templateMethodExecuteTemplate, 2},
+		"funcs":            {templateMethodFuncs, 1},
+		"lookup":           {templateMethodLookup, 1},
+		"name":             {templateMethodName, 0},
+		"new":              {templateMethodNew, 1},
+		"option":           {templateMethodOption, 1},
+		"parse":            {templateMethodParse, 1},
 		// TODO: ParseFiles
 		// TODO: ParseGlob
-		// TODO: Templates
+		"templates": {templateMethodTemplates, 0},
 	}
 	var propDescs []napi.PropertyDescriptor
 	for name, spec := range methods {
@@ -198,6 +197,10 @@ func templateMethodClone(env napi.Env, this *template.Template, args []napi.Valu
 		return nil, err
 	}
 	return wrapExistingTemplate(env, cloned)
+}
+
+func templateMethodDefinedTemplates(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+	return env.CreateString(this.DefinedTemplates())
 }
 
 func templateMethodDelims(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
@@ -387,4 +390,22 @@ func templateMethodParse(env napi.Env, this *template.Template, args []napi.Valu
 		panic("Expected Parse to return itself")
 	}
 	return nil, nil // XXX: Should return this
+}
+
+func templateMethodTemplates(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
+	templates := this.Templates()
+	result, err := env.CreateArrayWithLength(len(templates))
+	if err != nil {
+		return nil, err
+	}
+	for i, template := range templates {
+		wrapped, err := wrapExistingTemplate(env, template)
+		if err != nil {
+			return nil, err
+		}
+		if err := env.SetElement(result, uint32(i), wrapped); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
