@@ -190,9 +190,9 @@ func makeTemplateMethodCallback(fn templateMethodFunc, minArgs int, chain bool) 
 func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	// Build property descriptors
 	type method struct {
-		fn    templateMethodFunc
+		fn      templateMethodFunc
 		minArgs int
-		chain bool
+		chain   bool
 	}
 	methods := map[string]method{
 		// AddParseTree and ParseFS are unsupported
@@ -462,6 +462,7 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 			oldRefs = append(oldRefs, oldRef)
 		}
 	}
+	// TODO: This can panic if a name is invalid
 	jst.inner.Funcs(funcMap)
 
 	// Clean up old references
@@ -499,6 +500,17 @@ func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, e
 	return wrapExistingTemplate(env, jst.inner.New(name), jst.assn)
 }
 
+func (jst *jsTemplate) safeOption(options []string) (err error) {
+	// Option panics if the string is invalid, return an error instead
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("error setting option: %s", r)
+		}
+	}()
+	jst.inner.Option(options...)
+	return
+}
+
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
 	options := make([]string, len(args))
 	for i, arg := range args {
@@ -508,7 +520,9 @@ func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value
 		}
 		options[i] = option
 	}
-	jst.inner.Option(options...)
+	if err := jst.safeOption(options); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
