@@ -11,31 +11,75 @@ import (
 	"github.com/drakedevel/go-text-template-napi/internal/napi"
 )
 
+// templateAssn represents the "association" of Template objects. All jsTemplates
+// wrapping associated Templates must have the same templateAssn pointer.
 type templateAssn struct {
-	refs uint
+	// funcRefs holds the JS references for all JS functions passed to the
+	// Funcs method. The JS-internal refcount is used to track how many
+	// templateAssns (not jsTemplates) reference each function.
+	funcRefs map[string]napi.Ref
+
+	// refCount tracks the number of jsTemplates referring to this object.
+	// This has to be done manually so we can Unref references in funcRefs
+	// as soon as it hits zero in a jsTemplate finalize call, while we still
+	// have a napi.Env available.
+	refCount uint
 }
 
-func (ta *templateAssn) Clone() (*templateAssn, error) {
-	return new(templateAssn), nil
+func newTemplateAssn() *templateAssn {
+	return &templateAssn{make(map[string]napi.Ref), 0}
+}
+
+func (ta *templateAssn) AddFunctionRef(name string, ref napi.Ref) napi.Ref {
+	var result napi.Ref
+	if oldRef, ok := ta.funcRefs[name]; ok {
+		result = oldRef
+	}
+	ta.funcRefs[name] = ref
+	return result
+}
+
+func (ta *templateAssn) Clone(env napi.Env) (*templateAssn, error) {
+	// TODO: Leaks references if there's an error part-way through
+	result := newTemplateAssn()
+	for name, ref := range ta.funcRefs {
+		result.AddFunctionRef(name, ref)
+		if _, err := env.ReferenceRef(ref); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+func (ta *templateAssn) MaybeFinalize(env napi.Env) error {
+	if ta.refCount > 0 {
+		return nil
+	}
+	for _, ref := range ta.funcRefs {
+		if _, err := env.ReferenceUnref(ref); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (ta *templateAssn) Ref(jst *jsTemplate) {
 	if jst.assn != nil {
 		panic("Tried to associate template with multiple associations")
 	}
-	ta.refs++
+	ta.refCount++
 	jst.assn = ta
 }
 
 func (ta *templateAssn) Unref(jst *jsTemplate) {
-	if ta.refs == 0 {
+	if ta.refCount == 0 {
 		panic("Tried to unreference template association with 0 references")
 	}
 	if jst.assn != ta {
 		panic("Tried to unreference template from wrong association")
 	}
 	jst.assn = nil
-	ta.refs--
+	ta.refCount--
 }
 
 type jsTemplate struct {
@@ -185,7 +229,6 @@ func wrapTemplateObject(env napi.Env, object napi.Value, tmpl *template.Template
 	// Wait until after wrapping succeeds to reference the association to
 	// ensure the finalizer will be called.
 	assn.Ref(jst)
-	fmt.Printf("wrapped Template(%s), assn now has refcount %d\n", jst.inner.Name(), jst.assn.refs)
 	return nil
 }
 
@@ -209,8 +252,7 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 	}
 
 	// Create native object and attach to JS object
-	// TODO: Initialize Assn fields
-	if err := wrapTemplateObject(env, thisArg, template.New(name), new(templateAssn)); err != nil {
+	if err := wrapTemplateObject(env, thisArg, template.New(name), newTemplateAssn()); err != nil {
 		return nil, err
 	}
 	return nil, nil
@@ -218,11 +260,12 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 
 func templateFinalize(env napi.Env, data interface{}) error {
 	jst := data.(*jsTemplate)
-	if jst.assn != nil {
-		fmt.Printf("in template %s finalize, assn refcount is %d\n", jst.inner.Name(), jst.assn.refs)
-		jst.assn.Unref(jst)
+	assn := jst.assn
+	if assn == nil {
+		return nil
 	}
-	return nil
+	assn.Unref(jst)
+	return assn.MaybeFinalize(env)
 }
 
 func wrapExistingTemplate(env napi.Env, tmpl *template.Template, assn *templateAssn) (napi.Value, error) {
@@ -249,7 +292,7 @@ func (jst *jsTemplate) methodClone(env napi.Env, args []napi.Value) (napi.Value,
 	if err != nil {
 		return nil, err
 	}
-	clonedAssn, err := jst.assn.Clone()
+	clonedAssn, err := jst.assn.Clone(env)
 	if err != nil {
 		return nil, err
 	}
@@ -397,13 +440,26 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 		refMap[propName] = propRef
 	}
 
-	// Create closures to pass to Funcs
+	// Create closures and pass them to Funcs
 	funcMap := make(template.FuncMap)
+	var oldRefs []napi.Ref
 	for name, ref := range refMap {
-		// TODO: Attach references to association to prevent leak
 		funcMap[name] = makeJsCallback(&modData.envStack, ref)
+		oldRef := jst.assn.AddFunctionRef(name, ref)
+		if oldRef != nil {
+			oldRefs = append(oldRefs, oldRef)
+		}
 	}
 	jst.inner.Funcs(funcMap)
+
+	// Clean up old references
+	// TODO: Leaks if an error occurs in the middle
+	for _, ref := range oldRefs {
+		if _, err := env.ReferenceUnref(ref); err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil // XXX: Should return this
 }
 

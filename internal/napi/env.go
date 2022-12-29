@@ -133,6 +133,15 @@ func (env Env) DeleteReference(ref Ref) error {
 	return env.mapStatus(C.napi_delete_reference(env.inner, ref))
 }
 
+func (env Env) ReferenceRef(ref Ref) (uint32, error) {
+	var result C.uint32_t
+	status := C.napi_reference_ref(env.inner, ref, &result)
+	if err := env.mapStatus(status); err != nil {
+		return 0, err
+	}
+	return uint32(result), nil
+}
+
 func (env Env) ReferenceUnref(ref Ref) (uint32, error) {
 	var result C.uint32_t
 	status := C.napi_reference_unref(env.inner, ref, &result)
