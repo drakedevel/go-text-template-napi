@@ -213,96 +213,9 @@ func templateMethodDelims(env napi.Env, this *template.Template, args []napi.Val
 	return nil, nil // XXX: Should return this
 }
 
-func convertTemplateData(env napi.Env, value napi.Value) (interface{}, error) {
-	valueType, err := env.Typeof(value)
-	if err != nil {
-		return nil, err
-	}
-	switch valueType {
-	case napi.Undefined, napi.Null:
-		// TODO: Filter out Undefined from parent object, keep Null
-		return nil, nil
-	case napi.Boolean:
-		return env.GetValueBool(value)
-	case napi.Number:
-		return env.GetValueDouble(value)
-	case napi.String:
-		return extractString(env, value)
-	case napi.Object:
-		isArray, err := env.IsArray(value)
-		if err != nil {
-			return nil, err
-		}
-		if isArray {
-			length, err := env.GetArrayLength(value)
-			if err != nil {
-				return nil, err
-			}
-			result := make([]interface{}, length)
-			var i uint32
-			for i = 0; i < length; i++ {
-				// TODO: Scope?
-				elt, err := env.GetElement(value, i)
-				if err != nil {
-					return nil, err
-				}
-				eltConv, err := convertTemplateData(env, elt)
-				if err != nil {
-					return nil, err
-				}
-				result[i] = eltConv
-			}
-			return result, nil
-		} else {
-			// TODO: Should any other object types get special handling?
-			propNames, err := env.GetAllPropertyNames(value, napi.KeyOwnOnly, napi.KeySkipSymbols, napi.KeyNumbersToStrings)
-			if err != nil {
-				return nil, err
-			}
-			length, err := env.GetArrayLength(propNames)
-			if err != nil {
-				return nil, err
-			}
-			result := map[string]interface{}{}
-			var i uint32
-			for i = 0; i < length; i++ {
-				// TODO: Scope?
-				key, err := env.GetElement(propNames, i)
-				if err != nil {
-					return nil, err
-				}
-				keyStr, err := extractString(env, key)
-				if err != nil {
-					return nil, err
-				}
-				elt, err := env.GetProperty(value, key)
-				if err != nil {
-					return nil, err
-				}
-				eltConv, err := convertTemplateData(env, elt)
-				if err != nil {
-					return nil, err
-				}
-				result[keyStr] = eltConv
-			}
-			return result, nil
-		}
-	case napi.Bigint:
-		return extractBigint(env, value)
-	default:
-		// No useful way to map these to Go types
-		// TODO: More useful error message?
-		err = env.ThrowTypeError("ERR_INVALID_ARG_TYPE", "Unsupported value type")
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("threw exception")
-	}
-}
-
 func templateMethodExecute(env napi.Env, this *template.Template, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
-	data, err := convertTemplateData(env, args[0])
+	data, err := jsValueToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +239,7 @@ func templateMethodExecuteTemplate(env napi.Env, this *template.Template, args [
 	if err != nil {
 		return nil, err
 	}
-	data, err := convertTemplateData(env, args[1])
+	data, err := jsValueToGo(env, args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +259,6 @@ func templateMethodExecuteTemplate(env napi.Env, this *template.Template, args [
 
 func makeJsCallback(envStack *envStack, jsFnRef napi.Ref) interface{} {
 	return func(args ...interface{}) (interface{}, error) {
-		// FIXME: Pass args
 		env := envStack.Current()
 		jsFn, err := env.GetReferenceValue(jsFnRef)
 		if err != nil {
@@ -356,11 +268,19 @@ func makeJsCallback(envStack *envStack, jsFnRef napi.Ref) interface{} {
 		if err != nil {
 			return nil, err
 		}
-		result, err := env.CallFunction(undefVal, jsFn, nil)
+		jsArgs := make([]napi.Value, len(args))
+		for i, arg := range args {
+			jsArg, err := goValueToJs(env, arg)
+			if err != nil {
+				return nil, err
+			}
+			jsArgs[i] = jsArg
+		}
+		result, err := env.CallFunction(undefVal, jsFn, jsArgs)
 		if err != nil {
 			return nil, err
 		}
-		return convertTemplateData(env, result)
+		return jsValueToGo(env, result)
 	}
 }
 

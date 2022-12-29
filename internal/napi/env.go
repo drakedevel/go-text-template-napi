@@ -153,6 +153,51 @@ func (env Env) GetReferenceValue(ref Ref) (Value, error) {
 
 // Working with JavaScript values
 
+func (env Env) CreateArrayWithLength(length int) (Value, error) {
+	var result C.napi_value
+	status := C.napi_create_array_with_length(env.inner, C.size_t(length), &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
+func (env Env) CreateObject() (Value, error) {
+	var result C.napi_value
+	status := C.napi_create_object(env.inner, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
+func (env Env) CreateUint32(value uint32) (Value, error) {
+	var result C.napi_value
+	status := C.napi_create_uint32(env.inner, C.uint32_t(value), &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
+func (env Env) CreateInt64(value int64) (Value, error) {
+	var result C.napi_value
+	status := C.napi_create_int64(env.inner, C.int64_t(value), &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
+func (env Env) CreateDouble(value float64) (Value, error) {
+	var result C.napi_value
+	status := C.napi_create_double(env.inner, C.double(value), &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
 func (env Env) CreateString(str string) (Value, error) {
 	var result C.napi_value
 	status := C.NapiCreateString(env.inner, str, &result)
@@ -224,6 +269,24 @@ func (env Env) GetValueString(value Value, buf []byte) (int, error) {
 		return 0, err
 	}
 	return int(result), nil
+}
+
+func (env Env) GetBoolean(value bool) (Value, error) {
+	var result C.napi_value
+	status := C.napi_get_boolean(env.inner, C.bool(value), &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
+}
+
+func (env Env) GetNull() (Value, error) {
+	var result C.napi_value
+	status := C.napi_get_null(env.inner, &result)
+	if err := env.mapStatus(status); err != nil {
+		return nil, err
+	}
+	return Value(result), nil
 }
 
 func (env Env) GetUndefined() (Value, error) {
@@ -316,6 +379,10 @@ func (env Env) GetAllPropertyNames(object Value, keyMode KeyCollectionMode, keyF
 	return Value(result), nil
 }
 
+func (env Env) SetProperty(object Value, key Value, value Value) error {
+	return env.mapStatus(C.napi_set_property(env.inner, object, key, value))
+}
+
 func (env Env) GetProperty(object Value, key Value) (Value, error) {
 	var result C.napi_value
 	status := C.napi_get_property(env.inner, object, key, &result)
@@ -323,6 +390,11 @@ func (env Env) GetProperty(object Value, key Value) (Value, error) {
 		return nil, err
 	}
 	return Value(result), nil
+}
+
+func (env Env) SetElement(object Value, index uint32, value Value) error {
+	status := C.napi_set_element(env.inner, object, C.uint32_t(index), value)
+	return env.mapStatus(status)
 }
 
 func (env Env) GetElement(object Value, index uint32) (Value, error) {
