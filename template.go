@@ -105,6 +105,18 @@ func extractString(env napi.Env, value napi.Value) (string, error) {
 	return string(buf[0:strLen]), nil
 }
 
+func extractStrings(env napi.Env, value []napi.Value) ([]string, error) {
+	result := make([]string, len(value))
+	for i, element := range value {
+		str, err := extractString(env, element)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = str
+	}
+	return result, nil
+}
+
 func extractBigint(env napi.Env, value napi.Value) (*big.Int, error) {
 	// Get length
 	wordCount := 0
@@ -187,12 +199,28 @@ func makeTemplateMethodCallback(fn templateMethodFunc, minArgs int, chain bool) 
 	})
 }
 
+type templateStaticMethodFunc func(napi.Env, []napi.Value) (napi.Value, error)
+
+func makeTemplateStaticMethodCallback(fn templateStaticMethodFunc, minArgs int) (napi.Callback, unsafe.Pointer, func()) {
+	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
+		_, args, err := callbackEntry(env, info, minArgs)
+		if err != nil {
+			return nil, err
+		}
+		return fn(env, args)
+	})
+}
+
 func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	// Build property descriptors
 	type method struct {
 		fn      templateMethodFunc
 		minArgs int
 		chain   bool
+	}
+	type staticMethod struct {
+		fn      templateStaticMethodFunc
+		minArgs int
 	}
 	methods := map[string]method{
 		// AddParseTree and ParseFS are unsupported
@@ -211,6 +239,11 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		"parseGlob":        {(*jsTemplate).methodParseGlob, 1, true},
 		"templates":        {(*jsTemplate).methodTemplates, 0, false},
 	}
+	staticMethods := map[string]staticMethod{
+		// ParseFS is unsupported
+		"parseFiles": {staticTemplateParseFiles, 0},
+		"parseGlob":  {staticTemplateParseGlob, 1},
+	}
 	var propDescs []napi.PropertyDescriptor
 	for name, spec := range methods {
 		// TODO: Don't leak cbData
@@ -223,6 +256,20 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 			Name:       nameObj,
 			Method:     cb,
 			Attributes: napi.DefaultMethod,
+			Data:       cbData,
+		})
+	}
+	for name, spec := range staticMethods {
+		// TODO: Don't leak cbData
+		cb, cbData, _ := makeTemplateStaticMethodCallback(spec.fn, spec.minArgs)
+		nameObj, err := env.CreateString(name)
+		if err != nil {
+			return nil, err
+		}
+		propDescs = append(propDescs, napi.PropertyDescriptor{
+			Name:       nameObj,
+			Method:     cb,
+			Attributes: napi.Static | napi.DefaultMethod,
 			Data:       cbData,
 		})
 	}
@@ -512,13 +559,9 @@ func (jst *jsTemplate) safeOption(options []string) (err error) {
 }
 
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
-	options := make([]string, len(args))
-	for i, arg := range args {
-		option, err := extractString(env, arg)
-		if err != nil {
-			return nil, err
-		}
-		options[i] = option
+	options, err := extractStrings(env, args)
+	if err != nil {
+		return nil, err
 	}
 	if err := jst.safeOption(options); err != nil {
 		return nil, err
@@ -540,13 +583,9 @@ func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value,
 }
 
 func (jst *jsTemplate) methodParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
-	files := make([]string, len(args))
-	for i, arg := range args {
-		option, err := extractString(env, arg)
-		if err != nil {
-			return nil, err
-		}
-		files[i] = option
+	files, err := extractStrings(env, args)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := jst.inner.ParseFiles(files...); err != nil {
 		// TODO: Map to better JS error?
@@ -583,4 +622,28 @@ func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Va
 		}
 	}
 	return result, nil
+}
+
+func staticTemplateParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
+	files, err := extractStrings(env, args)
+	if err != nil {
+		return nil, err
+	}
+	result, err := template.ParseFiles(files...)
+	if err != nil {
+		return nil, err
+	}
+	return wrapExistingTemplate(env, result, newTemplateAssn())
+}
+
+func staticTemplateParseGlob(env napi.Env, args []napi.Value) (napi.Value, error) {
+	glob, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	result, err := template.ParseGlob(glob)
+	if err != nil {
+		return nil, err
+	}
+	return wrapExistingTemplate(env, result, newTemplateAssn())
 }
