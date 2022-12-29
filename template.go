@@ -194,11 +194,11 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		"lookup":           {(*jsTemplate).methodLookup, 1, false},
 		"name":             {(*jsTemplate).methodName, 0, false},
 		"new":              {(*jsTemplate).methodNew, 1, false},
-		"option":           {(*jsTemplate).methodOption, 1, true},
+		"option":           {(*jsTemplate).methodOption, 1, true}, // XXX variadic
 		"parse":            {(*jsTemplate).methodParse, 1, true},
-		// TODO: ParseFiles
-		// TODO: ParseGlob
-		"templates": {(*jsTemplate).methodTemplates, 0, false},
+		"parseFiles":       {(*jsTemplate).methodParseFiles, 1, true}, // XXX variadic
+		"parseGlob":        {(*jsTemplate).methodParseGlob, 1, true},
+		"templates":        {(*jsTemplate).methodTemplates, 0, false},
 	}
 	var propDescs []napi.PropertyDescriptor
 	for name, spec := range methods {
@@ -503,13 +503,35 @@ func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value,
 	if err != nil {
 		return nil, err
 	}
-	result, err := jst.inner.Parse(text)
-	if err != nil {
+
+	if _, err := jst.inner.Parse(text); err != nil {
 		// TODO: Map to better JS error?
 		return nil, err
 	}
-	if result != jst.inner {
-		panic("Expected Parse to return itself")
+	return nil, nil
+}
+
+func (jst *jsTemplate) methodParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
+	// XXX: Should be variadic
+	text, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	if _, err := jst.inner.ParseFiles(text); err != nil {
+		// TODO: Map to better JS error?
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (jst *jsTemplate) methodParseGlob(env napi.Env, args []napi.Value) (napi.Value, error) {
+	text, err := extractString(env, args[0])
+	if err != nil {
+		return nil, err
+	}
+	if _, err := jst.inner.ParseGlob(text); err != nil {
+		// TODO: Map to better JS error?
+		return nil, err
 	}
 	return nil, nil
 }
