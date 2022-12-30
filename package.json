@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "license": "UNLICENSED",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drakedevel/go-text-template-napi.git"
+  },
   "os": [
     "darwin",
     "linux"
@@ -23,8 +27,5 @@
   },
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.10"
-  },
-  "devDependencies": {
-    "node-pre-gyp-github": "^1.4.4"
   }
 }
