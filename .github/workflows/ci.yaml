@@ -19,6 +19,10 @@ jobs:
     - name: Verify binding can be require()d
       run: ./node_modules/.bin/node-pre-gyp testbinary
     - run: ./node_modules/.bin/node-pre-gyp package
+    - uses: actions/upload-artifact@v3
+      with:
+        name: bindings
+        path: build/stage/
 
     # Cross-compile for aarch64
     - name: Install aarch64 build tools
@@ -32,8 +36,6 @@ jobs:
         CGO_ENABLED: '1'
         GOARCH: arm64
     - run: ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
-
-    # Upload artifacts
     - uses: actions/upload-artifact@v3
       with:
         name: bindings
