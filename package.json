@@ -6,5 +6,25 @@
   "os": [
     "darwin",
     "linux"
-  ]
+  ],
+  "main": "index.js",
+  "scripts": {
+    "install": "node-pre-gyp install --fallback-to-build"
+  },
+  "binary": {
+    "module_name": "go_text_template_napi_binding",
+    "module_path": "lib/napi-v{napi_build_version}",
+    "host": "https://github.com/drakedevel/go-text-template-napi/releases/download/",
+    "remote_path": "{version}",
+    "package_name": "{platform}-{arch}-napi-v{napi_build_version}.tar.gz",
+    "napi_versions": [
+      8
+    ]
+  },
+  "dependencies": {
+    "@mapbox/node-pre-gyp": "^1.0.10"
+  },
+  "devDependencies": {
+    "node-pre-gyp-github": "^1.4.4"
+  }
 }

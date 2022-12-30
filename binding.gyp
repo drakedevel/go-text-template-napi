@@ -1,8 +1,11 @@
 {
   'targets': [{
-    'target_name': 'binding',
+    'target_name': '<(module_name)',
     'actions': [{
       'action_name': 'gobuild',
+      'defines': [
+        'NAPI_VERSION=<(napi_build_version)',
+      ],
       'outputs': ['<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)'],
       'inputs': [
         'gobuild.py',
@@ -22,5 +25,13 @@
         },
       }],
     ],
+  }, {
+    'target_name': 'copy_build',
+    'type': 'none',
+    'dependencies': ['<(module_name)'],
+    'copies': [{
+      'files': ['<(PRODUCT_DIR)/<(module_name).node'],
+      'destination': '<(module_path)'
+    }]
   }],
 }
