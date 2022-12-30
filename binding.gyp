@@ -30,7 +30,12 @@
     'type': 'none',
     'dependencies': ['<(module_name)'],
     'copies': [{
-      'files': ['<(PRODUCT_DIR)/<(module_name).node'],
+      'files': [
+        '<(PRODUCT_DIR)/<(module_name).node',
+        'LICENSE',
+        'NOTICE',
+        'packaging/LICENSE.golang',
+      ],
       'destination': '<(module_path)'
     }]
   }],

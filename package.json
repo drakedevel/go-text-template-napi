@@ -1,12 +1,9 @@
 {
   "name": "go-text-template-napi",
   "version": "0.0.1",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "private": true,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/drakedevel/go-text-template-napi.git"
-  },
+  "repository": "github:drakedevel/go-text-template-napi",
   "os": [
     "darwin",
     "linux"
