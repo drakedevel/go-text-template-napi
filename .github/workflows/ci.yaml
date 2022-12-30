@@ -17,3 +17,17 @@ jobs:
     - run: npm ci
     - name: Verify binding can be require()d
       run: ./node_modules/.bin/node-pre-gyp testbinary
+    - run: ./node_modules/.bin/node-pre-gyp package
+
+    # Cross-compile for aarch64
+    - name: Install aarch64 build tools
+      if: matrix.os == 'ubuntu-22.04'
+      run: |
+        sudo apt-get -y install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        echo "CC=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+        echo "CXX=aarch64-linux-gnu-g++" >> "$GITHUB_ENV"
+    - run: ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm64
+      env:
+        CGO_ENABLED: '1'
+        GOARCH: arm64
+    - run: ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
