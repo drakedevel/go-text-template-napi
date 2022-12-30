@@ -15,7 +15,7 @@
     "module_name": "go_text_template_napi_binding",
     "module_path": "lib/napi-v{napi_build_version}",
     "host": "https://github.com/drakedevel/go-text-template-napi/releases/download/",
-    "remote_path": "{version}",
+    "remote_path": "v{version}",
     "package_name": "{platform}-{arch}-napi-v{napi_build_version}.tar.gz",
     "napi_versions": [
       8
