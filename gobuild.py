@@ -14,8 +14,11 @@ def main():
     cflags = [f'-D{d}' for d in defines] + [f'-I{i}' for i in include_dirs]
     if sys.platform.startswith('darwin'):
         cflags.append('-mmacosx-version-min=10.13')
+    buildflags = ['-buildmode=c-archive', '-o', out_path]
+    if os.environ.get('CI') == 'true':
+        buildflags.append('-ldflags=-s -w')
     subprocess.run(
-        ['go', 'build', '-buildmode=c-archive', '-o', out_path, '.'],
+        ['go', 'build'] + buildflags + ['.'],
         check=True,
         env=dict(os.environ, CGO_CFLAGS=shlex.join(cflags)),
     )
