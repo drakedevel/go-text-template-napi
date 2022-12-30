@@ -12,6 +12,8 @@ def main():
     defines = shlex.split(sys.argv[2])
     include_dirs = shlex.split(sys.argv[3])
     cflags = [f'-D{d}' for d in defines] + [f'-I{i}' for i in include_dirs]
+    if sys.platform.startswith('darwin'):
+        cflags.append('-mmacosx-version-min=10.13')
     subprocess.run(
         ['go', 'build', '-buildmode=c-archive', '-o', out_path, '.'],
         check=True,
