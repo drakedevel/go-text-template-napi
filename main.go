@@ -1,10 +1,6 @@
 package main
 
-import (
-	"fmt"
-
-	"github.com/drakedevel/go-text-template-napi/internal/napi"
-)
+import "github.com/drakedevel/go-text-template-napi/internal/napi"
 
 type moduleData struct {
 	templateConstructor napi.Ref
@@ -20,7 +16,6 @@ func getInstanceData(env napi.Env) (*moduleData, error) {
 }
 
 func moduleTeardown(env napi.Env, data interface{}) error {
-	fmt.Println("In N-API module teardown")
 	modData := data.(*moduleData)
 	if err := env.DeleteReference(modData.templateConstructor); err != nil {
 		return err
@@ -29,8 +24,6 @@ func moduleTeardown(env napi.Env, data interface{}) error {
 }
 
 func moduleInit(env napi.Env, exports napi.Value) (napi.Value, error) {
-	fmt.Println("In N-API module init")
-
 	var propDescs []napi.PropertyDescriptor
 
 	clsName, err := env.CreateString("Template")
