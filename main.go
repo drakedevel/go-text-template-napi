@@ -39,7 +39,7 @@ func makeHelperBuilder(impl staticMethodFunc, minArgs int) propBuilder {
 
 func makeEscapeStringBuilder(fn func(string) string) propBuilder {
 	return makeHelperBuilder(func(env napi.Env, args []napi.Value) (napi.Value, error) {
-		str, err := extractString(env, args[0])
+		str, err := jsStringToGo(env, args[0])
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +49,7 @@ func makeEscapeStringBuilder(fn func(string) string) propBuilder {
 
 func makeEscaperBuilder(fn func(...any) string) propBuilder {
 	return makeHelperBuilder(func(env napi.Env, args []napi.Value) (napi.Value, error) {
-		goArgs, err := extractArray(env, args, jsValueToGo)
+		goArgs, err := jsValuesToGo(env, args, jsValueToGo)
 		if err != nil {
 			return nil, err
 		}

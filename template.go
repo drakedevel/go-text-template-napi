@@ -2,9 +2,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"math/big"
 	"text/template"
 	"unsafe"
 
@@ -88,65 +86,6 @@ type jsTemplate struct {
 }
 
 var templateWrapper = napi.NewSafeWrapper[jsTemplate](0x1b339336b7154e7d, 0xa8cd781754bef7c9)
-
-func extractString(env napi.Env, value napi.Value) (string, error) {
-	// Get string length
-	strLen, err := env.GetValueString(value, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Allocate buffer and get string contents
-	buf := make([]byte, strLen+1)
-	strLen, err = env.GetValueString(value, buf)
-	if err != nil {
-		return "", err
-	}
-	return string(buf[0:strLen]), nil
-}
-
-func extractArray[T any](env napi.Env, value []napi.Value, extract func(napi.Env, napi.Value) (T, error)) ([]T, error) {
-	result := make([]T, len(value))
-	for i, element := range value {
-		str, err := extract(env, element)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = str
-	}
-	return result, nil
-}
-
-func extractBigint(env napi.Env, value napi.Value) (*big.Int, error) {
-	// Get length
-	wordCount := 0
-	if err := env.GetValueBigintWords(value, nil, &wordCount, nil); err != nil {
-		return nil, err
-	}
-
-	// Allocate space and get contents
-	var signBit int
-	words := make([]uint64, wordCount)
-	if err := env.GetValueBigintWords(value, &signBit, &wordCount, &words[0]); err != nil {
-		return nil, err
-	}
-
-	// Convert to big-endian bytes
-	var buf bytes.Buffer
-	for i := len(words) - 1; i >= 0; i-- {
-		err := binary.Write(&buf, binary.BigEndian, words[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	result := new(big.Int)
-	result.SetBytes(buf.Bytes())
-	if signBit > 0 {
-		result.Neg(result)
-	}
-	return result, nil
-}
 
 func callbackEntry(env napi.Env, info napi.CallbackInfo, minArgs int) (napi.Value, []napi.Value, error) {
 	// Get argument count
@@ -305,7 +244,7 @@ func templateConstructor(env napi.Env, info napi.CallbackInfo) (napi.Value, erro
 		return nil, err
 	}
 
-	name, err := extractString(env, argv[0])
+	name, err := jsStringToGo(env, argv[0])
 	if err != nil {
 		return nil, err
 	}
@@ -363,11 +302,11 @@ func (jst *jsTemplate) methodDefinedTemplates(env napi.Env, args []napi.Value) (
 }
 
 func (jst *jsTemplate) methodDelims(env napi.Env, args []napi.Value) (napi.Value, error) {
-	left, err := extractString(env, args[0])
+	left, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
-	right, err := extractString(env, args[1])
+	right, err := jsStringToGo(env, args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +336,7 @@ func (jst *jsTemplate) methodExecute(env napi.Env, args []napi.Value) (napi.Valu
 
 func (jst *jsTemplate) methodExecuteTemplate(env napi.Env, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
-	name, err := extractString(env, args[0])
+	name, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +414,7 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 		if err != nil {
 			return nil, err
 		}
-		propName, err := extractString(env, propNameValue)
+		propName, err := jsStringToGo(env, propNameValue)
 		if err != nil {
 			return nil, err
 		}
@@ -531,7 +470,7 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 }
 
 func (jst *jsTemplate) methodLookup(env napi.Env, args []napi.Value) (napi.Value, error) {
-	name, err := extractString(env, args[0])
+	name, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +486,7 @@ func (jst *jsTemplate) methodName(env napi.Env, args []napi.Value) (napi.Value, 
 }
 
 func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, error) {
-	name, err := extractString(env, args[0])
+	name, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +494,7 @@ func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, e
 }
 
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
-	options, err := extractArray(env, args, extractString)
+	options, err := jsValuesToGo(env, args, jsStringToGo)
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +508,7 @@ func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value
 }
 
 func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value, error) {
-	text, err := extractString(env, args[0])
+	text, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +521,7 @@ func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value,
 }
 
 func (jst *jsTemplate) methodParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
-	files, err := extractArray(env, args, extractString)
+	files, err := jsValuesToGo(env, args, jsStringToGo)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +533,7 @@ func (jst *jsTemplate) methodParseFiles(env napi.Env, args []napi.Value) (napi.V
 }
 
 func (jst *jsTemplate) methodParseGlob(env napi.Env, args []napi.Value) (napi.Value, error) {
-	text, err := extractString(env, args[0])
+	text, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +563,7 @@ func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Va
 }
 
 func staticTemplateParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
-	files, err := extractArray(env, args, extractString)
+	files, err := jsValuesToGo(env, args, jsStringToGo)
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +575,7 @@ func staticTemplateParseFiles(env napi.Env, args []napi.Value) (napi.Value, erro
 }
 
 func staticTemplateParseGlob(env napi.Env, args []napi.Value) (napi.Value, error) {
-	glob, err := extractString(env, args[0])
+	glob, err := jsStringToGo(env, args[0])
 	if err != nil {
 		return nil, err
 	}

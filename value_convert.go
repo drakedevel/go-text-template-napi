@@ -1,11 +1,61 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"math/big"
 	"reflect"
 
 	"github.com/drakedevel/go-text-template-napi/internal/napi"
 )
+
+func jsBigintToGo(env napi.Env, value napi.Value) (*big.Int, error) {
+	// Get length
+	wordCount := 0
+	if err := env.GetValueBigintWords(value, nil, &wordCount, nil); err != nil {
+		return nil, err
+	}
+
+	// Allocate space and get contents
+	var signBit int
+	words := make([]uint64, wordCount)
+	if err := env.GetValueBigintWords(value, &signBit, &wordCount, &words[0]); err != nil {
+		return nil, err
+	}
+
+	// Convert to big-endian bytes
+	var buf bytes.Buffer
+	for i := len(words) - 1; i >= 0; i-- {
+		err := binary.Write(&buf, binary.BigEndian, words[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result := new(big.Int)
+	result.SetBytes(buf.Bytes())
+	if signBit > 0 {
+		result.Neg(result)
+	}
+	return result, nil
+}
+
+func jsStringToGo(env napi.Env, value napi.Value) (string, error) {
+	// Get string length
+	strLen, err := env.GetValueString(value, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Allocate buffer and get string contents
+	buf := make([]byte, strLen+1)
+	strLen, err = env.GetValueString(value, buf)
+	if err != nil {
+		return "", err
+	}
+	return string(buf[0:strLen]), nil
+}
 
 func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 	valueType, err := env.Typeof(value)
@@ -21,7 +71,7 @@ func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 	case napi.Number:
 		return env.GetValueDouble(value)
 	case napi.String:
-		return extractString(env, value)
+		return jsStringToGo(env, value)
 	case napi.Object:
 		isArray, err := env.IsArray(value)
 		if err != nil {
@@ -63,7 +113,7 @@ func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 				if err != nil {
 					return nil, err
 				}
-				keyStr, err := extractString(env, key)
+				keyStr, err := jsStringToGo(env, key)
 				if err != nil {
 					return nil, err
 				}
@@ -80,7 +130,7 @@ func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 			return result, nil
 		}
 	case napi.Bigint:
-		return extractBigint(env, value)
+		return jsBigintToGo(env, value)
 	default:
 		// No useful way to map these to Go types
 		// TODO: More useful error message?
@@ -90,6 +140,18 @@ func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 		}
 		return nil, fmt.Errorf("threw exception")
 	}
+}
+
+func jsValuesToGo[T any](env napi.Env, value []napi.Value, conv func(napi.Env, napi.Value) (T, error)) ([]T, error) {
+	result := make([]T, len(value))
+	for i, element := range value {
+		str, err := conv(env, element)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = str
+	}
+	return result, nil
 }
 
 func goValueToJs(env napi.Env, value interface{}) (napi.Value, error) {
