@@ -15,8 +15,8 @@
       'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
     }],
     'conditions': [
-      # TODO: Other platforms
-      ['OS=="linux"', {
+      # TODO: Windows support
+      ['OS in "aix freebsd linux netbsd openbsd solaris".split()', {
         'ldflags+': ['-Wl,--whole-archive,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX),--no-whole-archive'],
       }],
       ['OS=="mac"', {

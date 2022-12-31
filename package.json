@@ -1,8 +1,9 @@
 {
   "name": "go-text-template-napi",
-  "version": "0.0.1",
+  "version": "0.0.0",
+  "descripton": "N-API bindings for Go's text/template package",
+  "author": "Andrew Drake <adrake@adrake.org>",
   "license": "Apache-2.0",
-  "private": true,
   "repository": "github:drakedevel/go-text-template-napi",
   "os": [
     "darwin",
