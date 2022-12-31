@@ -20,6 +20,7 @@ def main():
     subprocess.run(
         ['go', 'build'] + buildflags + ['.'],
         check=True,
+        cwd=os.path.dirname(__file__),
         env=dict(os.environ, CGO_CFLAGS=shlex.join(cflags)),
     )
 

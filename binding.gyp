@@ -10,7 +10,7 @@
       'inputs': [
         'gobuild.py',
         'go.mod',
-        '<!@(go list -f \'{{ range .GoFiles }}{{ $.Dir }}/{{ . }} {{ end }}{{ range .CgoFiles }}{{ $.Dir }}/{{ . }} {{ end }}\' ./...)',
+        '<!@(bash listfiles.sh)',
       ],
       'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
     }],
@@ -22,6 +22,13 @@
       ['OS=="mac"', {
         'xcode_settings': {
           'OTHER_LDFLAGS+': ['-Wl,-force_load,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)'],
+        },
+      }],
+      ['OS=="win"', {
+        'msvs_settings': {
+          'VCLinkerTool': {
+            'AdditionalOptions+': ['/WHOLEARCHIVE:<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)'],
+          }
         },
       }],
     ],
