@@ -446,6 +446,12 @@ func makeJsCallback(envStack *envStack, jsFnRef napi.Ref) interface{} {
 	}
 }
 
+func panicToErr(err *error) {
+	if r := recover(); r != nil {
+		*err = fmt.Errorf("caught panic: %v", r)
+	}
+}
+
 func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value, error) {
 	modData, err := getInstanceData(env)
 	if err != nil {
@@ -459,9 +465,10 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 	if err != nil {
 		return nil, err
 	}
-	// Create references for all passed-in functions
-	// TODO: Leaks if errors occcur part-way through this loop
+	// Create references and closures for all passed-in functions
+	// TODO: Leaks if errors occcur before Funcs succeeds
 	refMap := make(map[string]napi.Ref)
+	funcMap := make(template.FuncMap)
 	for i := uint32(0); i < length; i++ {
 		// TODO: Scope?
 		propNameValue, err := env.GetElement(propNames, i)
@@ -497,26 +504,26 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 			return nil, err
 		}
 		refMap[propName] = propRef
+		funcMap[propName] = makeJsCallback(&modData.envStack, propRef)
 	}
 
-	// Create closures and pass them to Funcs
-	funcMap := make(template.FuncMap)
-	var oldRefs []napi.Ref
+	// Funcs panics if the caller passes in an invalid name, so catch that
+	// and convert it to a normal error.
+	err = func() (err error) {
+		defer panicToErr(&err)
+		jst.inner.Funcs(funcMap)
+		return
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	// Save new references, and unreference any replaced functions
 	for name, ref := range refMap {
-		funcMap[name] = makeJsCallback(&modData.envStack, ref)
 		oldRef := jst.assn.AddFunctionRef(name, ref)
 		if oldRef != nil {
-			oldRefs = append(oldRefs, oldRef)
-		}
-	}
-	// TODO: This can panic if a name is invalid
-	jst.inner.Funcs(funcMap)
-
-	// Clean up old references
-	// TODO: Leaks if an error occurs in the middle
-	for _, ref := range oldRefs {
-		if _, err := env.ReferenceUnref(ref); err != nil {
-			return nil, err
+			// Swallow errors here since we can't do anything about them
+			_, _ = env.ReferenceUnref(oldRef)
 		}
 	}
 
@@ -547,26 +554,18 @@ func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, e
 	return wrapExistingTemplate(env, jst.inner.New(name), jst.assn)
 }
 
-func (jst *jsTemplate) safeOption(options []string) (err error) {
-	// Option panics if the string is invalid, return an error instead
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("error setting option: %s", r)
-		}
-	}()
-	jst.inner.Option(options...)
-	return
-}
-
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
 	options, err := extractStrings(env, args)
 	if err != nil {
 		return nil, err
 	}
-	if err := jst.safeOption(options); err != nil {
-		return nil, err
-	}
-	return nil, nil
+	// Option panics if the string is invalid, return an error instead
+	err = func() (err error) {
+		defer panicToErr(&err)
+		jst.inner.Option(options...)
+		return
+	}()
+	return nil, err
 }
 
 func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value, error) {
