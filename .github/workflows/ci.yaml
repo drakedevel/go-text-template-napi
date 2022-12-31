@@ -15,7 +15,7 @@ jobs:
       with:
         node-version: '16'
         cache: npm
-    - run: npm ci
+    - run: npm ci --build-from-source
     - name: Verify binding can be require()d
       run: ./node_modules/.bin/node-pre-gyp testbinary
     - run: ./node_modules/.bin/node-pre-gyp package
