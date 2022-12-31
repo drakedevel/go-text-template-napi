@@ -2,8 +2,17 @@ This library provides JavaScript bindings to [Go's text/template
 package][text-template] package via [N-API][n-api]. Nearly the full API is
 supported, including custom template functions written in JavaScript.
 
-For example, this Go program:
+For example, this JavaScript program:
+```ts
+import {Template} from 'go-text-template-napi';
 
+const template = new Template("name")
+  .funcs({double: l => [...l, ...l]})
+  .parse(`{{ range double .targets }}Hello, {{ . }}!\n{{ end }}`);
+process.stdout.write(template.execute({targets: ['user', 'world']}));
+```
+
+is equivalent to this Go program:
 ```go
 package main
 
@@ -24,15 +33,6 @@ func main() {
                 panic(err)
         }
 }
-```
-can be written in JavaScript like this:
-```ts
-import {Template} from 'go-text-template-napi';
-
-const template = new Template("name")
-  .funcs({double: l => [...l, ...l]})
-  .parse(`{{ range double .targets }}Hello, {{ . }}!\n{{ end }}`);
-process.stdout.write(template.execute({targets: ['user', 'world']}));
 ```
 
 Both output:
