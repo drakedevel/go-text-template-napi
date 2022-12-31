@@ -33,11 +33,11 @@ an untrusted template can trivially DoS your application by generating an output
 larger than your available memory.
 
 ### API Limitations
-Several parts of the API are unimplemented:
+A few less-useful parts of the API are unimplemented:
 - The `parse` subpackage and related functions (they're documented as internal
   interfaces)
 - All functions operating on a `fs.FS` virtual fileystem
-- The `*Escape` helper functions (support is planned)
+- The `*Escape` helper functions that write to a `io.Writer`
 
 Additionally, the `Execute` and `ExecuteTemplate` methods return strings instead
 of taking a `Writer` parameter. This is faster than a streaming interface given

@@ -105,10 +105,10 @@ func extractString(env napi.Env, value napi.Value) (string, error) {
 	return string(buf[0:strLen]), nil
 }
 
-func extractStrings(env napi.Env, value []napi.Value) ([]string, error) {
-	result := make([]string, len(value))
+func extractArray[T any](env napi.Env, value []napi.Value, extract func(napi.Env, napi.Value) (T, error)) ([]T, error) {
+	result := make([]T, len(value))
 	for i, element := range value {
-		str, err := extractString(env, element)
+		str, err := extract(env, element)
 		if err != nil {
 			return nil, err
 		}
@@ -199,9 +199,9 @@ func makeTemplateMethodCallback(fn templateMethodFunc, minArgs int, chain bool) 
 	})
 }
 
-type templateStaticMethodFunc func(napi.Env, []napi.Value) (napi.Value, error)
+type staticMethodFunc func(napi.Env, []napi.Value) (napi.Value, error)
 
-func makeTemplateStaticMethodCallback(fn templateStaticMethodFunc, minArgs int) (napi.Callback, unsafe.Pointer, func()) {
+func makeStaticMethodCallback(fn staticMethodFunc, minArgs int) (napi.Callback, unsafe.Pointer, func()) {
 	return napi.MakeNapiCallback(func(env napi.Env, info napi.CallbackInfo) (napi.Value, error) {
 		_, args, err := callbackEntry(env, info, minArgs)
 		if err != nil {
@@ -211,7 +211,7 @@ func makeTemplateStaticMethodCallback(fn templateStaticMethodFunc, minArgs int) 
 	})
 }
 
-func buildTemplateClass(env napi.Env) (napi.Value, error) {
+func buildTemplateClass(env napi.Env, clsName string) (napi.Value, error) {
 	// Build property descriptors
 	type method struct {
 		fn      templateMethodFunc
@@ -219,7 +219,7 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 		chain   bool
 	}
 	type staticMethod struct {
-		fn      templateStaticMethodFunc
+		fn      staticMethodFunc
 		minArgs int
 	}
 	methods := map[string]method{
@@ -261,7 +261,7 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	}
 	for name, spec := range staticMethods {
 		// TODO: Don't leak cbData
-		cb, cbData, _ := makeTemplateStaticMethodCallback(spec.fn, spec.minArgs)
+		cb, cbData, _ := makeStaticMethodCallback(spec.fn, spec.minArgs)
 		nameObj, err := env.CreateString(name)
 		if err != nil {
 			return nil, err
@@ -277,7 +277,7 @@ func buildTemplateClass(env napi.Env) (napi.Value, error) {
 	// Define class
 	// TODO: Don't leak consData
 	consCb, consData, _ := napi.MakeNapiCallback(templateConstructor)
-	return env.DefineClass("Template", consCb, consData, propDescs)
+	return env.DefineClass(clsName, consCb, consData, propDescs)
 }
 
 func wrapTemplateObject(env napi.Env, object napi.Value, tmpl *template.Template, assn *templateAssn) error {
@@ -555,7 +555,7 @@ func (jst *jsTemplate) methodNew(env napi.Env, args []napi.Value) (napi.Value, e
 }
 
 func (jst *jsTemplate) methodOption(env napi.Env, args []napi.Value) (napi.Value, error) {
-	options, err := extractStrings(env, args)
+	options, err := extractArray(env, args, extractString)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +582,7 @@ func (jst *jsTemplate) methodParse(env napi.Env, args []napi.Value) (napi.Value,
 }
 
 func (jst *jsTemplate) methodParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
-	files, err := extractStrings(env, args)
+	files, err := extractArray(env, args, extractString)
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +624,7 @@ func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Va
 }
 
 func staticTemplateParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
-	files, err := extractStrings(env, args)
+	files, err := extractArray(env, args, extractString)
 	if err != nil {
 		return nil, err
 	}
