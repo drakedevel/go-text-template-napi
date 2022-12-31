@@ -34,7 +34,7 @@ jobs:
     needs: [third-party-licenses]
     strategy:
       matrix:
-        os: [macos-14, ubuntu-24.04]
+        os: [windows-2022] # , macos-14, ubuntu-24.04]
     outputs:
       hash-macos-14: ${{ steps.hash.outputs.hash-macos-14 }}
       hash-ubuntu-24.04: ${{ steps.hash.outputs['hash-ubuntu-24.04'] }}
@@ -69,7 +69,10 @@ jobs:
           npx -c 'node-pre-gyp package'
           mkdir binaries
           mv build/stage/*/* binaries
+      - run: gdb --batch -ex run --args node index.js
+        shell: bash
       - run: npm run test
+        if: runner.os != 'Windows'
       # Cross builds
       - name: Cross build for amd64
         if: runner.os == 'macOS'

@@ -11,9 +11,9 @@
       'inputs': [
         'gobuild.py',
         'go.mod',
-        '<!@(go list -f \'{{ range .GoFiles }}{{ $.Dir }}/{{ . }} {{ end }}{{ range .CgoFiles }}{{ $.Dir }}/{{ . }} {{ end }}\' ./...)',
+        '<!@(bash listfiles.sh)',
       ],
-      'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
+      'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)', '>(_libraries)'],
     }],
   }, {
     'target_name': 'copy_build',
