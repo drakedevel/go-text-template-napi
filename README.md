@@ -2,9 +2,50 @@ This library provides JavaScript bindings to [Go's text/template
 package][text-template] package via [N-API][n-api]. Nearly the full API is
 supported, including custom template functions written in JavaScript.
 
-**Do not use this library with untrusted templates**, and use caution when
-passing untrusted data to trusted templates. See [Warnings](#warnings) section
-for more details.
+For example, this Go program:
+
+```go
+package main
+
+import (
+        "os"
+        "text/template"
+)
+
+func double(list []any) []any {
+        return append(list, list...)
+}
+
+func main() {
+        tmpl := template.New("name").Funcs(template.FuncMap{"double": double})
+        template.Must(tmpl.Parse("{{ range double .targets }}Hello, {{ . }}!\n{{ end }}"))
+        err := tmpl.Execute(os.Stdout, map[string]any{"targets": []any{"user", "world"}})
+        if err != nil {
+                panic(err)
+        }
+}
+```
+can be written in JavaScript like this:
+```ts
+import {Template} from 'go-text-template-napi';
+
+const template = new Template("name")
+  .funcs({double: l => [...l, ...l]})
+  .parse(`{{ range double .targets }}Hello, {{ . }}!\n{{ end }}`);
+process.stdout.write(template.execute({targets: ['user', 'world']}));
+```
+
+Both output:
+```text
+Hello, user!
+Hello, world!
+Hello, user!
+Hello, world!
+```
+
+**WARNING**: Do **not** use this library with untrusted templates, and use
+_extreme_ caution when passing untrusted data to trusted templates. See the
+[Warnings](#warnings) section for more details.
 
 [n-api]: https://nodejs.org/api/n-api.html
 [text-template]: https://pkg.go.dev/text/template
@@ -20,6 +61,7 @@ they are unavailable for your platform, the install script will try to build
 them automatically, which requires Go 1.18 or later.
 
 ### Warnings
+
 Importing this package will spin up a Go runtime _within_ your Node
 process. Should this library have a bug that results in a Go panic, it will take
 the entire process with it.
