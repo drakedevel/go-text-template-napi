@@ -10,6 +10,7 @@
     "linux"
   ],
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "install": "node-pre-gyp install --fallback-to-build"
   },
