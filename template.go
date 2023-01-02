@@ -163,20 +163,21 @@ func buildTemplateClass(env napi.Env, clsName string) (napi.Value, error) {
 	}
 	methods := map[string]method{
 		// AddParseTree and ParseFS are unsupported
-		"clone":            {(*jsTemplate).methodClone, 0, false},
-		"definedTemplates": {(*jsTemplate).methodDefinedTemplates, 0, false},
-		"delims":           {(*jsTemplate).methodDelims, 2, true},
-		"execute":          {(*jsTemplate).methodExecute, 1, false},
-		"executeTemplate":  {(*jsTemplate).methodExecuteTemplate, 2, false},
-		"funcs":            {(*jsTemplate).methodFuncs, 1, true},
-		"lookup":           {(*jsTemplate).methodLookup, 1, false},
-		"name":             {(*jsTemplate).methodName, 0, false},
-		"new":              {(*jsTemplate).methodNew, 1, false},
-		"option":           {(*jsTemplate).methodOption, 0, true},
-		"parse":            {(*jsTemplate).methodParse, 1, true},
-		"parseFiles":       {(*jsTemplate).methodParseFiles, 0, true},
-		"parseGlob":        {(*jsTemplate).methodParseGlob, 1, true},
-		"templates":        {(*jsTemplate).methodTemplates, 0, false},
+		// Execute and ExecuteTemplates are supported with string returns
+		"clone":                 {(*jsTemplate).methodClone, 0, false},
+		"definedTemplates":      {(*jsTemplate).methodDefinedTemplates, 0, false},
+		"delims":                {(*jsTemplate).methodDelims, 2, true},
+		"executeString":         {(*jsTemplate).methodExecuteString, 1, false},
+		"executeTemplateString": {(*jsTemplate).methodExecuteTemplateString, 2, false},
+		"funcs":                 {(*jsTemplate).methodFuncs, 1, true},
+		"lookup":                {(*jsTemplate).methodLookup, 1, false},
+		"name":                  {(*jsTemplate).methodName, 0, false},
+		"new":                   {(*jsTemplate).methodNew, 1, false},
+		"option":                {(*jsTemplate).methodOption, 0, true},
+		"parse":                 {(*jsTemplate).methodParse, 1, true},
+		"parseFiles":            {(*jsTemplate).methodParseFiles, 0, true},
+		"parseGlob":             {(*jsTemplate).methodParseGlob, 1, true},
+		"templates":             {(*jsTemplate).methodTemplates, 0, false},
 	}
 	staticMethods := map[string]staticMethod{
 		// ParseFS is unsupported
@@ -314,7 +315,7 @@ func (jst *jsTemplate) methodDelims(env napi.Env, args []napi.Value) (napi.Value
 	return nil, nil
 }
 
-func (jst *jsTemplate) methodExecute(env napi.Env, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodExecuteString(env napi.Env, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
 	data, err := jsValueToGo(env, args[0])
 	if err != nil {
@@ -334,7 +335,7 @@ func (jst *jsTemplate) methodExecute(env napi.Env, args []napi.Value) (napi.Valu
 	return env.CreateString(buf.String())
 }
 
-func (jst *jsTemplate) methodExecuteTemplate(env napi.Env, args []napi.Value) (napi.Value, error) {
+func (jst *jsTemplate) methodExecuteTemplateString(env napi.Env, args []napi.Value) (napi.Value, error) {
 	// TODO: Allow passing in a stream?
 	name, err := jsStringToGo(env, args[0])
 	if err != nil {

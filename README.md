@@ -9,7 +9,7 @@ import {Template} from 'go-text-template-napi';
 const template = new Template("name")
   .funcs({double: l => [...l, ...l]})
   .parse(`{{ range double .targets }}Hello, {{ . }}!\n{{ end }}`);
-process.stdout.write(template.execute({targets: ['user', 'world']}));
+process.stdout.write(template.executeString({targets: ['user', 'world']}));
 ```
 
 is equivalent to this Go program:

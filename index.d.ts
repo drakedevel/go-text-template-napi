@@ -6,8 +6,8 @@ export class Template {
   clone(): Template;
   definedTemplates(): string;
   delims(left: string, right: string): Template;
-  execute(data: unknown): string;
-  executeTemplate(name: string, data: unknown): string;
+  executeString(data?: unknown): string;
+  executeTemplateString(name: string, data?: unknown): string;
   funcs(funcMap: FuncMap): Template;
   lookup(name: string): Template | undefined;
   name(): string;
