@@ -1,4 +1,4 @@
-type FuncMap = {[name: string]: (...args: unknown[]) => unknown};
+type FuncMap = {[name: string]: (...args: any[]) => any};
 
 export class Template {
   constructor(name: string);
