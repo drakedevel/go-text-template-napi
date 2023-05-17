@@ -35,8 +35,17 @@
         'LICENSE',
         'NOTICE',
         'packaging/LICENSE.golang',
+        'packaging/NOTICE.third-party',
       ],
       'destination': '<(module_path)'
-    }]
+    }],
+    'conditions': [
+      ['<!(test -d packaging/third-party && echo 1 || echo 0)==1', {
+        'copies+': [{
+          'files': ['packaging/third-party'],
+          'destination': '<(module_path)',
+        }],
+      }],
+    ],
   }],
 }

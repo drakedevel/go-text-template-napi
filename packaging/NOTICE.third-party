@@ -1,0 +1,6 @@
+This binary package contains statically linked third-party software.
+Licenses for that software are included in the third-party directory
+alongside this file.
+
+In addition, the license for statically linked Go language components
+is in the LICENSE.golang file.

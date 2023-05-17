@@ -8,13 +8,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v4
       with:
-        go-version: '1.18'
+        go-version-file: go.mod
     - uses: actions/setup-node@v3
       with:
         node-version: '16'
         cache: npm
+
+    # Fetch third-party license notices to include in binary packages
+    - run: go install github.com/google/go-licenses@v1.6.0
+    - name: Download third-party license files
+      run: |
+        go-licenses save ./... --ignore $(go list -m) --save_path packaging/third-party
+        chmod -R u+w packaging/third-party
+
+    # Build, test, and upload native extension
     - run: npm ci --build-from-source
     - name: Verify binding can be require()d
       run: ./node_modules/.bin/node-pre-gyp testbinary

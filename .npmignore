@@ -2,3 +2,4 @@
 /build/
 /build-tmp-*/
 /lib/napi-*/
+/packaging/third-party/
