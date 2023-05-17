@@ -1,5 +1,5 @@
 This library provides JavaScript bindings to [Go's text/template
-package][text-template] package via [N-API][n-api]. Nearly the full API is
+package][text-template] package via [Node-API][node-api]. Nearly the full API is
 supported, including custom template functions written in JavaScript.
 
 For example, this JavaScript program:
@@ -47,11 +47,11 @@ Hello, world!
 _extreme_ caution when passing untrusted data to trusted templates. See the
 [Warnings](#warnings) section for more details.
 
-[n-api]: https://nodejs.org/api/n-api.html
+[node-api]: https://nodejs.org/api/node-api.html
 [text-template]: https://pkg.go.dev/text/template
 
 ### Requirements
-The native component requires N-API version 8, which is available on all
+The native component requires Node-API version 8, which is available on all
 supported release lines of Node. It's tested on Linux and MacOS, and will
 probably work on any Unix-like operating system. Windows support is possible but
 currently absent. PRs to expand platform support are welcome!

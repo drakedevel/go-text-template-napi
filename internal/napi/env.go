@@ -54,7 +54,7 @@ func (env Env) GetLastErrorInfo() (*ExtendedErrorInfo, error) {
 	var info *C.napi_extended_error_info
 	status := C.napi_get_last_error_info(env.inner, &info)
 	if status != C.napi_ok {
-		return nil, fmt.Errorf("failed to get N-API error info: %d", status)
+		return nil, fmt.Errorf("failed to get Node-API error info: %d", status)
 	}
 	return &ExtendedErrorInfo{
 		errorMessage:    C.GoString(info.error_message),
@@ -105,9 +105,9 @@ func (env Env) mapStatus(status C.napi_status) error {
 	}
 	info, err := env.GetLastErrorInfo()
 	if err != nil {
-		return fmt.Errorf("N-API error code %v. Error getting extended info: %w", status, err)
+		return fmt.Errorf("Node-API error code %v. Error getting extended info: %w", status, err)
 	}
-	return fmt.Errorf("N-API Error: %s (code %d)", info.errorMessage, info.errorCode)
+	return fmt.Errorf("Node-API Error: %s (code %d)", info.errorMessage, info.errorCode)
 }
 
 func (env Env) maybeThrowError(err error) {
@@ -122,7 +122,7 @@ func (env Env) maybeThrowError(err error) {
 	throwErr := env.ThrowError("", err.Error())
 	if throwErr != nil {
 		// TODO: Anything more useful to do here?
-		fmt.Println("N-API error", throwErr, "throwing error", err)
+		fmt.Println("Node-API error", throwErr, "throwing error", err)
 	}
 }
 

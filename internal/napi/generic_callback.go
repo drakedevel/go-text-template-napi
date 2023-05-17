@@ -47,7 +47,7 @@ func genericNapiFinalize(rawEnv C.napi_env, data unsafe.Pointer, hint unsafe.Poi
 	dataHandle := unlaunderHandle(data)
 	hintHandle := unlaunderHandle(hint)
 	if err := hintHandle.Value().(finalizeFunc)(env, dataHandle.Value()); err != nil {
-		// N-API won't propagate an exception from a finalizer, so just log it
+		// Node-API won't propagate an exception from a finalizer, so just log it
 		fmt.Println("Uncaught exception in finalizer:", err)
 	}
 	deleteLaunderedHandle(data)
