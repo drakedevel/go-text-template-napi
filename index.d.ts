@@ -20,6 +20,14 @@ export class Template {
 
   static parseFiles(...files: string[]): Template;
   static parseGlob(glob: string): Template;
+
+  // Methods below this line are not part of the text/template API.
+
+  /** Add `sprig.TxtFuncMap()` template functions. */
+  addSprigFuncs(): Template;
+
+  /** Add `sprig.HermeticTxtFuncMap()` template functions. */
+  addSprigHermeticFuncs(): Template;
 }
 
 export function htmlEscapeString(str: string): string;

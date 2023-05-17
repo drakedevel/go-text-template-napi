@@ -6,6 +6,7 @@ import (
 	"text/template"
 	"unsafe"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/drakedevel/go-text-template-napi/internal/napi"
 )
 
@@ -67,6 +68,16 @@ func (ta *templateAssn) Ref(jst *jsTemplate) {
 	}
 	ta.refCount++
 	jst.assn = ta
+}
+
+func (ta *templateAssn) RemoveFunctionRef(name string) napi.Ref {
+	// While there's no way to delete a Func once one has been added, we may
+	// need to delete a ref if we replace a JS function with a native one.
+	if oldRef, ok := ta.funcRefs[name]; ok {
+		delete(ta.funcRefs, name)
+		return oldRef
+	}
+	return nil
 }
 
 func (ta *templateAssn) Unref(jst *jsTemplate) {
@@ -178,6 +189,10 @@ func buildTemplateClass(env napi.Env, clsName string) (napi.Value, error) {
 		"parseFiles":            {(*jsTemplate).methodParseFiles, 0, true},
 		"parseGlob":             {(*jsTemplate).methodParseGlob, 1, true},
 		"templates":             {(*jsTemplate).methodTemplates, 0, false},
+
+		// These functions are not part of the text/template API
+		"addSprigFuncs":         {(*jsTemplate).methodAddSprigFuncs, 0, true},
+		"addSprigHermeticFuncs": {(*jsTemplate).methodAddSprigHermeticFuncs, 0, true},
 	}
 	staticMethods := map[string]staticMethod{
 		// ParseFS is unsupported
@@ -561,6 +576,31 @@ func (jst *jsTemplate) methodTemplates(env napi.Env, args []napi.Value) (napi.Va
 		}
 	}
 	return result, nil
+}
+
+func (jst *jsTemplate) addNativeFuncs(env napi.Env, funcs template.FuncMap) error {
+	// Add the native functions
+	jst.inner.Funcs(funcs)
+
+	// Unreference any JS functions these replaced
+	for name := range funcs {
+		oldRef := jst.assn.RemoveFunctionRef(name)
+		if oldRef != nil {
+			// Swallow errors here since we can't do anything about them
+			_, _ = env.ReferenceUnref(oldRef)
+		}
+	}
+	return nil
+}
+
+func (jst *jsTemplate) methodAddSprigFuncs(env napi.Env, args []napi.Value) (napi.Value, error) {
+	err := jst.addNativeFuncs(env, sprig.TxtFuncMap())
+	return nil, err
+}
+
+func (jst *jsTemplate) methodAddSprigHermeticFuncs(env napi.Env, args []napi.Value) (napi.Value, error) {
+	err := jst.addNativeFuncs(env, sprig.HermeticTxtFuncMap())
+	return nil, err
 }
 
 func staticTemplateParseFiles(env napi.Env, args []napi.Value) (napi.Value, error) {
