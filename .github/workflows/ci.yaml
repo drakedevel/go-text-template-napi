@@ -7,13 +7,13 @@ jobs:
         os: [macos-12, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@v4
       with:
-        node-version: '16'
+        node-version: '18'
         cache: npm
 
     # Fetch third-party license notices to include in binary packages
@@ -28,9 +28,9 @@ jobs:
     - name: Verify binding can be require()d
       run: ./node_modules/.bin/node-pre-gyp testbinary
     - run: ./node_modules/.bin/node-pre-gyp package
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
-        name: bindings
+        name: bindings-${{ matrix.os }}-amd64
         path: build/stage/
 
     # Cross-compile for aarch64
@@ -45,15 +45,15 @@ jobs:
         CGO_ENABLED: '1'
         GOARCH: arm64
     - run: ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
-        name: bindings
+        name: bindings-${{ matrix.os }}-arm64
         path: build/stage/
 
     # Build/upload NPM package artifact
     - run: npm pack
       if: matrix.os == 'ubuntu-22.04'
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       if: matrix.os == 'ubuntu-22.04'
       with:
         name: npm-package
@@ -64,11 +64,12 @@ jobs:
     needs: build
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/download-artifact@v3
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
       with:
-        name: bindings
-    - uses: actions/download-artifact@v3
+        pattern: bindings-*
+        merge-multiple: true
+    - uses: actions/download-artifact@v4
       with:
         name: npm-package
     - run: gh release create ${{ github.ref_name }} -d --generate-notes --target ${{ github.sha }} ./${{ github.ref_name }}/*.tar.gz "./go-text-template-napi-${GITHUB_REF_NAME#v}.tgz"
