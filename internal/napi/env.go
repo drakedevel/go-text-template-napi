@@ -4,17 +4,6 @@ package napi
 // #include <stdint.h>
 // #include <stdlib.h>
 // #include <node_api.h>
-// napi_status NapiCreateFunction(napi_env env, _GoString_ name, napi_callback cb, void* data, napi_value* result) {
-//   return napi_create_function(env, _GoStringPtr(name), _GoStringLen(name), cb, data, result);
-// }
-//
-// napi_status NapiCreateString(napi_env env, _GoString_ str, napi_value* result) {
-//   return napi_create_string_utf8(env, _GoStringPtr(str), _GoStringLen(str), result);
-// }
-//
-// napi_status NapiDefineClass(napi_env env, _GoString_ name, napi_callback constructor, void* data, size_t property_count, const napi_property_descriptor* properties, napi_value* result) {
-//   return napi_define_class(env, _GoStringPtr(name), _GoStringLen(name), constructor, data, property_count, properties, result);
-// }
 import "C"
 import (
 	"fmt"
@@ -219,7 +208,8 @@ func (env Env) CreateDouble(value float64) (Value, error) {
 
 func (env Env) CreateString(str string) (Value, error) {
 	var result C.napi_value
-	status := C.NapiCreateString(env.inner, str, &result)
+	strPtr := (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
+	status := C.napi_create_string_utf8(env.inner, strPtr, C.size_t(len(str)), &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -278,11 +268,7 @@ func (env Env) GetValueBigintWords(value Value, signBit *int, wordCount *int, wo
 func (env Env) GetValueString(value Value, buf []byte) (int, error) {
 	// TODO: Maybe go ahead and handle allocating the buffer / converting to string?
 	var result C.size_t
-	var bufPtr *C.char
-	if len(buf) > 0 {
-		bufPtr = (*C.char)(unsafe.Pointer(&buf[0]))
-	}
-
+	bufPtr := (*C.char)(unsafe.Pointer(unsafe.SliceData(buf)))
 	status := C.napi_get_value_string_utf8(env.inner, value, bufPtr, C.size_t(len(buf)), &result)
 	if err := env.mapStatus(status); err != nil {
 		return 0, err
@@ -446,11 +432,7 @@ func (env Env) DefineProperties(object Value, properties []PropertyDescriptor) e
 
 func (env Env) CallFunction(recv Value, fun Value, argv []Value) (Value, error) {
 	var result C.napi_value
-	var cArgv *C.napi_value
-	if len(argv) > 0 {
-		cArgv = (*C.napi_value)(&argv[0])
-	}
-	status := C.napi_call_function(env.inner, recv, fun, C.size_t(len(argv)), cArgv, &result)
+	status := C.napi_call_function(env.inner, recv, fun, C.size_t(len(argv)), (*C.napi_value)(unsafe.SliceData(argv)), &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -459,7 +441,8 @@ func (env Env) CallFunction(recv Value, fun Value, argv []Value) (Value, error) 
 
 func (env Env) CreateFunction(name string, data unsafe.Pointer, cb Callback) (Value, error) {
 	var result C.napi_value
-	status := C.NapiCreateFunction(env.inner, name, cb, data, &result)
+	namePtr := (*C.char)(unsafe.Pointer(unsafe.StringData(name)))
+	status := C.napi_create_function(env.inner, namePtr, C.size_t(len(name)), cb, data, &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -485,11 +468,7 @@ func (env Env) GetCbInfo(cbinfo CallbackInfo, argc *int, argv *Value, thisArg *V
 
 func (env Env) NewInstance(cons Value, argv []Value) (Value, error) {
 	var result C.napi_value
-	var cArgv *C.napi_value
-	if len(argv) > 0 {
-		cArgv = (*C.napi_value)(&argv[0])
-	}
-	status := C.napi_new_instance(env.inner, cons, C.size_t(len(argv)), cArgv, &result)
+	status := C.napi_new_instance(env.inner, cons, C.size_t(len(argv)), (*C.napi_value)(unsafe.SliceData(argv)), &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
@@ -501,7 +480,8 @@ func (env Env) NewInstance(cons Value, argv []Value) (Value, error) {
 func (env Env) DefineClass(name string, constructor Callback, data unsafe.Pointer, properties []PropertyDescriptor) (Value, error) {
 	pdLen, pdPtr := env.convertPropertyDescriptors(properties)
 	var result C.napi_value
-	status := C.NapiDefineClass(env.inner, "Template", constructor, data, pdLen, pdPtr, &result)
+	namePtr := (*C.char)(unsafe.Pointer(unsafe.StringData(name)))
+	status := C.napi_define_class(env.inner, namePtr, C.size_t(len(name)), constructor, data, pdLen, pdPtr, &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
 	}
