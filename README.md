@@ -64,7 +64,7 @@ currently absent. PRs to expand platform support are welcome!
 
 Pre-built binaries are available for Linux and MacOS on 64-bit x86 and ARM. If
 they are unavailable for your platform, the install script will try to build
-them automatically, which requires Go 1.18 or later.
+them automatically, which requires Go 1.20 or later.
 
 ### Warnings
 Importing this package will spin up a Go runtime _within_ your Node
