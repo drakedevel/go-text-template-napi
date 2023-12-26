@@ -1,6 +1,6 @@
 {
   "name": "go-text-template-napi",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "descripton": "Node-API bindings for Go's text/template package",
   "author": "Andrew Drake <adrake@adrake.org>",
   "license": "Apache-2.0",
