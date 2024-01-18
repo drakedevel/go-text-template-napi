@@ -2,7 +2,7 @@ name: CodeQL
 
 on:
   push:
-    branches: [main]
+    branches: [main, codeql]
   pull_request:
     branches: [main]
   schedule:
@@ -42,7 +42,7 @@ jobs:
           languages: go
           queries: security-extended,security-and-quality
 
-      - run: ./node_modules/.bin/node-pre-gyp rebuild
+      - uses: github/codeql-action/autobuild@e5f05b81d5b6ff8cfa111c80c22c5fd02a384118 # v3.23.0
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@e5f05b81d5b6ff8cfa111c80c22c5fd02a384118 # v3.23.0
