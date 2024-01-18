@@ -7,11 +7,11 @@ jobs:
         os: [macos-12, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4.1.1
-    - uses: actions/setup-go@v5.0.0
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+    - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
       with:
         go-version-file: go.mod
-    - uses: actions/setup-node@v4.0.1
+    - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
       with:
         node-version: '18'
         cache: npm
@@ -28,7 +28,7 @@ jobs:
     - name: Verify binding can be require()d
       run: ./node_modules/.bin/node-pre-gyp testbinary
     - run: ./node_modules/.bin/node-pre-gyp package
-    - uses: actions/upload-artifact@v4.1.0
+    - uses: actions/upload-artifact@1eb3cb2b3e0f29609092a73eb033bb759a334595 # v4.1.0
       with:
         name: bindings-${{ matrix.os }}-amd64
         path: build/stage/
@@ -46,7 +46,7 @@ jobs:
         CGO_ENABLED: '1'
         GOARCH: arm64
     - run: ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
-    - uses: actions/upload-artifact@v4.1.0
+    - uses: actions/upload-artifact@1eb3cb2b3e0f29609092a73eb033bb759a334595 # v4.1.0
       with:
         name: bindings-${{ matrix.os }}-arm64
         path: build/stage/
@@ -54,7 +54,7 @@ jobs:
     # Build/upload NPM package artifact
     - run: npm pack
       if: matrix.os == 'ubuntu-22.04'
-    - uses: actions/upload-artifact@v4.1.0
+    - uses: actions/upload-artifact@1eb3cb2b3e0f29609092a73eb033bb759a334595 # v4.1.0
       if: matrix.os == 'ubuntu-22.04'
       with:
         name: npm-package
@@ -65,12 +65,12 @@ jobs:
     needs: build
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4.1.1
-    - uses: actions/download-artifact@v4.1.1
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+    - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
       with:
         pattern: bindings-*
         merge-multiple: true
-    - uses: actions/download-artifact@v4.1.1
+    - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
       with:
         name: npm-package
     - run: gh release create ${{ github.ref_name }} -d --generate-notes --target ${{ github.sha }} ./${{ github.ref_name }}/*.tar.gz "./go-text-template-napi-${GITHUB_REF_NAME#v}.tgz"
