@@ -15,6 +15,8 @@ def main():
     if sys.platform.startswith('darwin'):
         cflags.append('-mmacosx-version-min=10.13')
     buildflags = ['-buildmode=c-archive', '-o', out_path]
+    if os.environ.get('GO_TEXT_TEMPLATE_NAPI_COVERAGE') == 'true':
+        buildflags.extend(['-cover', '-tags=coverage'])
     if os.environ.get('CI') == 'true':
         buildflags.append('-ldflags=-s -w')
     subprocess.run(
