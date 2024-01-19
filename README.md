@@ -1,3 +1,7 @@
+[![codecov](https://codecov.io/gh/drakedevel/go-text-template-napi/graph/badge.svg?token=5ADSAXMWON)](https://codecov.io/gh/drakedevel/go-text-template-napi)
+
+# go-text-template-napi
+
 This library provides JavaScript bindings to [Go's text/template
 package][text-template] package via [Node-API][node-api]. Nearly the full API is
 supported, including custom template functions written in JavaScript.
