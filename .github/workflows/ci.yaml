@@ -76,3 +76,29 @@ jobs:
     - run: gh release create ${{ github.ref_name }} -d --generate-notes --target ${{ github.sha }} ./${{ github.ref_name }}/*.tar.gz "./go-text-template-napi-${GITHUB_REF_NAME#v}.tgz"
       env:
         GH_TOKEN: ${{ github.token }}
+
+  test-coverage:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+    - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      with:
+        go-version-file: go.mod
+    - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+      with:
+        node-version: '18'
+        cache: npm
+
+    - run: npm ci --build-from-source
+      env:
+        GO_TEXT_TEMPLATE_NAPI_COVERAGE: 'true'
+    - run: mkdir gocov
+    - run: npm run test -- --coverage --coverageReporters=json
+      env:
+        GOCOVERDIR: gocov
+    - run: go tool covdata textfmt -i=gocov -o=go-coverage.txt
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
