@@ -65,6 +65,15 @@ describe('Template', () => {
       expect(myFunc).toHaveBeenCalledTimes(1);
     });
 
+    it('can overwrite old functions', () => {
+      const oldFunc = jest.fn();
+      template.funcs({myFunc: oldFunc});
+      const newFunc = () => 'ok';
+      template.funcs({myFunc: newFunc}).parse('{{ myFunc }}');
+      expect(template.executeString()).toBe('ok');
+      expect(oldFunc).not.toHaveBeenCalled();
+    });
+
     it('round-trips JS types', () => {
       const myFunc = jest.fn((value: unknown) => value);
       template.funcs({ myFunc });
@@ -98,6 +107,19 @@ describe('Template', () => {
       template.funcs({ throwErr() { throw err; } });
       template.parse('{{ throwErr }}');
       expect(() => template.executeString()).toThrow(err);
+    });
+
+    test('native functions can overwrite JS functions', () => {
+      const oldAtoi = jest.fn();
+      template.funcs({ atoi: oldAtoi }).addSprigFuncs().parse('{{ atoi "0" }}');
+      expect(template.executeString()).toBe('0');
+      expect(oldAtoi).not.toHaveBeenCalled();
+    });
+
+    test('JS functions can overwrite native functions', () => {
+      const atoi = () => "ok";
+      template.addSprigFuncs().funcs({ atoi }).parse('{{ atoi "0" }}');
+      expect(template.executeString()).toBe('ok');
     });
   });
 
@@ -184,8 +206,9 @@ describe('Template', () => {
 
   test('JS BigInt support works', () => {
     template.parse('{{ . }}');
-    expect(template.executeString(1n << 64n)).toBe('18446744073709551616');
-    expect(template.executeString(-123n)).toBe('-123');
+    const value = (1n << 128n) + 2n; // Endianness test with 64-bit words
+    expect(template.executeString(value)).toBe(value.toString());
+    expect(template.executeString(-value)).toBe((-value).toString());
   })
 });
 
