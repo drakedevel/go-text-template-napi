@@ -7,98 +7,98 @@ jobs:
         os: [macos-12, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-    - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-      with:
-        go-version-file: go.mod
-    - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
-      with:
-        node-version: '18'
-        cache: npm
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+        with:
+          node-version: '18'
+          cache: npm
 
-    # Fetch third-party license notices to include in binary packages
-    - run: go install github.com/google/go-licenses@v1.6.0
-    - name: Download third-party license files
-      run: |
-        go-licenses save ./... --ignore $(go list -m) --save_path packaging/third-party
-        chmod -R u+w packaging/third-party
+      # Fetch third-party license notices to include in binary packages
+      - run: go install github.com/google/go-licenses@v1.6.0
+      - name: Download third-party license files
+        run: |
+          go-licenses save ./... --ignore $(go list -m) --save_path packaging/third-party
+          chmod -R u+w packaging/third-party
 
-    # Build, test, and upload native extension
-    - run: npm ci --build-from-source
-    - name: Verify binding can be require()d
-      run: ./node_modules/.bin/node-pre-gyp testbinary
-    - run: ./node_modules/.bin/node-pre-gyp package
-    - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
-      with:
-        name: bindings-${{ matrix.os }}-amd64
-        path: build/stage/
+      # Build, test, and upload native extension
+      - run: npm ci --build-from-source
+      - name: Verify binding can be require()d
+        run: ./node_modules/.bin/node-pre-gyp testbinary
+      - run: ./node_modules/.bin/node-pre-gyp package
+      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        with:
+          name: bindings-${{ matrix.os }}-amd64
+          path: build/stage/
 
-    # Cross-compile for aarch64
-    - name: Install aarch64 build tools
-      if: matrix.os == 'ubuntu-22.04'
-      run: |
-        sudo apt-get -y update
-        sudo apt-get -y install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-        echo "CC=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
-        echo "CXX=aarch64-linux-gnu-g++" >> "$GITHUB_ENV"
-    - run: ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm64
-      env:
-        CGO_ENABLED: '1'
-        GOARCH: arm64
-    - run: ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
-    - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
-      with:
-        name: bindings-${{ matrix.os }}-arm64
-        path: build/stage/
+      # Cross-compile for aarch64
+      - name: Install aarch64 build tools
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          echo "CC=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+          echo "CXX=aarch64-linux-gnu-g++" >> "$GITHUB_ENV"
+      - run: ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm64
+        env:
+          CGO_ENABLED: '1'
+          GOARCH: arm64
+      - run: ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
+      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        with:
+          name: bindings-${{ matrix.os }}-arm64
+          path: build/stage/
 
-    # Build/upload NPM package artifact
-    - run: npm pack
-      if: matrix.os == 'ubuntu-22.04'
-    - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
-      if: matrix.os == 'ubuntu-22.04'
-      with:
-        name: npm-package
-        path: go-text-template-napi-*.tgz
+      # Build/upload NPM package artifact
+      - run: npm pack
+        if: matrix.os == 'ubuntu-22.04'
+      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        if: matrix.os == 'ubuntu-22.04'
+        with:
+          name: npm-package
+          path: go-text-template-napi-*.tgz
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-    - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
-      with:
-        pattern: bindings-*
-        merge-multiple: true
-    - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
-      with:
-        name: npm-package
-    - run: gh release create ${{ github.ref_name }} -d --generate-notes --target ${{ github.sha }} ./${{ github.ref_name }}/*.tar.gz "./go-text-template-napi-${GITHUB_REF_NAME#v}.tgz"
-      env:
-        GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+        with:
+          pattern: bindings-*
+          merge-multiple: true
+      - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+        with:
+          name: npm-package
+      - run: gh release create ${{ github.ref_name }} -d --generate-notes --target ${{ github.sha }} ./${{ github.ref_name }}/*.tar.gz "./go-text-template-napi-${GITHUB_REF_NAME#v}.tgz"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   test-coverage:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-    - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-      with:
-        go-version-file: go.mod
-    - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
-      with:
-        node-version: '18'
-        cache: npm
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+        with:
+          node-version: '18'
+          cache: npm
 
-    - run: npm ci --build-from-source
-      env:
-        GO_TEXT_TEMPLATE_NAPI_COVERAGE: 'true'
-    - run: mkdir gocov
-    - run: npm run test -- --coverage --coverageReporters=json
-      env:
-        GOCOVERDIR: gocov
-    - run: go tool covdata textfmt -i=gocov -o=go-coverage.txt
+      - run: npm ci --build-from-source
+        env:
+          GO_TEXT_TEMPLATE_NAPI_COVERAGE: 'true'
+      - run: mkdir gocov
+      - run: npm run test -- --coverage --coverageReporters=json
+        env:
+          GOCOVERDIR: gocov
+      - run: go tool covdata textfmt -i=gocov -o=go-coverage.txt
 
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

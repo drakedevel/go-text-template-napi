@@ -1,7 +1,7 @@
 {
   "extends": ["@tsconfig/node18", "@tsconfig/strictest"],
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
   },
-  "include": ["index.d.ts", "tests/**/*.ts"]
+  "include": ["index.d.ts", "tests/**/*.ts"],
 }

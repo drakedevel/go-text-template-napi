@@ -7,16 +7,18 @@ package][text-template] package via [Node-API][node-api]. Nearly the full API is
 supported, including custom template functions written in JavaScript.
 
 For example, this JavaScript program:
-```ts
-import {Template} from 'go-text-template-napi';
 
-const template = new Template("name")
-  .funcs({double: l => [...l, ...l]})
+```ts
+import { Template } from 'go-text-template-napi';
+
+const template = new Template('name')
+  .funcs({ double: (l) => [...l, ...l] })
   .parse(`{{ range double .targets }}Hello, {{ . }}!\n{{ end }}`);
-process.stdout.write(template.executeString({targets: ['user', 'world']}));
+process.stdout.write(template.executeString({ targets: ['user', 'world'] }));
 ```
 
 is equivalent to this Go program:
+
 ```go
 package main
 
@@ -40,6 +42,7 @@ func main() {
 ```
 
 Both output:
+
 ```text
 Hello, user!
 Hello, world!
@@ -55,12 +58,14 @@ _extreme_ caution when passing untrusted data to trusted templates. See the
 [text-template]: https://pkg.go.dev/text/template
 
 ### Experimental Sprig Support
+
 [Sprig][sprig] template functions can be enabled by calling the `addSprigFuncs`
 method on `Template`. This API is subject to change.
 
 [sprig]: https://github.com/Masterminds/sprig
 
 ### Requirements
+
 The native component requires Node-API version 8, which is available on all
 supported release lines of Node. It's tested on Linux and MacOS, and will
 probably work on any Unix-like operating system. Windows support is possible but
@@ -71,6 +76,7 @@ they are unavailable for your platform, the install script will try to build
 them automatically, which requires Go 1.20 or later.
 
 ### Warnings
+
 Importing this package will spin up a Go runtime _within_ your Node
 process. Should this library have a bug that results in a Go panic, it will take
 the entire process with it.
@@ -84,7 +90,9 @@ an untrusted template can trivially DoS your application by generating an output
 larger than your available memory.
 
 ### API Limitations
+
 A few less-useful parts of the API are unimplemented:
+
 - The `parse` subpackage and related functions (they're documented as internal
   interfaces)
 - All functions operating on a `fs.FS` virtual fileystem

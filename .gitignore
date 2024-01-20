@@ -1,5 +1,6 @@
 /build/
 /build-tmp-*/
+/coverage/
 /lib/napi-*/
 /node_modules/
 /packaging/third-party/

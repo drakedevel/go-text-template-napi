@@ -1,7 +1,7 @@
 import * as path from 'path';
 
 import * as binding from '..';
-import {Template} from '..';
+import { Template } from '..';
 
 const templateDir = path.join(__dirname, 'data');
 
@@ -24,8 +24,11 @@ describe('Template', () => {
       const f1 = jest.fn(() => 'result1');
       const f2 = jest.fn(() => 'result2');
       const f2alt = jest.fn(() => 'result2-alt');
-      const cloned = template.funcs({ f1, f2 }).parse('{{ f1 }} {{ f2 }}').clone();
-      cloned.funcs({f2: f2alt});
+      const cloned = template
+        .funcs({ f1, f2 })
+        .parse('{{ f1 }} {{ f2 }}')
+        .clone();
+      cloned.funcs({ f2: f2alt });
       expect(template.executeString()).toBe('result1 result2');
       expect(cloned.executeString()).toBe('result1 result2-alt');
       expect(f1).toHaveBeenCalledTimes(2);
@@ -37,7 +40,9 @@ describe('Template', () => {
   test('#definedTemplates works', () => {
     expect(template.definedTemplates()).toBe('');
     template.parse('{{define "foo"}}{{ end }}');
-    expect(template.definedTemplates()).toMatch(/^; defined templates are: ("foo", "test_template"|"test_template", "foo")$/);
+    expect(template.definedTemplates()).toMatch(
+      /^; defined templates are: ("foo", "test_template"|"test_template", "foo")$/,
+    );
   });
 
   test('#delims works', () => {
@@ -47,12 +52,16 @@ describe('Template', () => {
 
   test('#executeString works', () => {
     template.parse('{{ .foo }}, {{ .bar }}');
-    expect(template.executeString({foo: 'hello', bar: 'world'})).toBe('hello, world');
+    expect(template.executeString({ foo: 'hello', bar: 'world' })).toBe(
+      'hello, world',
+    );
   });
 
   test('#executeTemplateString works', () => {
     template.parse('{{ define "inner" }}inner {{ .param }}{{ end }}outer');
-    expect(template.executeTemplateString('inner', {param: 'param'})).toBe('inner param');
+    expect(template.executeTemplateString('inner', { param: 'param' })).toBe(
+      'inner param',
+    );
   });
 
   describe('#funcs', () => {
@@ -67,9 +76,9 @@ describe('Template', () => {
 
     it('can overwrite old functions', () => {
       const oldFunc = jest.fn();
-      template.funcs({myFunc: oldFunc});
+      template.funcs({ myFunc: oldFunc });
       const newFunc = () => 'ok';
-      template.funcs({myFunc: newFunc}).parse('{{ myFunc }}');
+      template.funcs({ myFunc: newFunc }).parse('{{ myFunc }}');
       expect(template.executeString()).toBe('ok');
       expect(oldFunc).not.toHaveBeenCalled();
     });
@@ -87,8 +96,8 @@ describe('Template', () => {
       expect(myFunc).toHaveBeenLastCalledWith(123);
       expect(template.executeString('param')).toBe('param');
       expect(myFunc).toHaveBeenLastCalledWith('param');
-      expect(template.executeString({foo: 'bar'})).toBe('map[foo:bar]');
-      expect(myFunc).toHaveBeenLastCalledWith({foo: 'bar'});
+      expect(template.executeString({ foo: 'bar' })).toBe('map[foo:bar]');
+      expect(myFunc).toHaveBeenLastCalledWith({ foo: 'bar' });
       expect(template.executeString(['foo', 'bar'])).toBe('[foo bar]');
       expect(myFunc).toHaveBeenLastCalledWith(['foo', 'bar']);
       // TODO: BigInt support when supported
@@ -100,11 +109,15 @@ describe('Template', () => {
       template.parse('{{ myFunc 123 }}');
       expect(template.executeString()).toBe('123');
       expect(myFunc).toHaveBeenCalledWith(123);
-    })
+    });
 
     it('propagates JS exceptions', () => {
       const err = new Error('test error');
-      template.funcs({ throwErr() { throw err; } });
+      template.funcs({
+        throwErr() {
+          throw err;
+        },
+      });
       template.parse('{{ throwErr }}');
       expect(() => template.executeString()).toThrow(err);
     });
@@ -117,7 +130,7 @@ describe('Template', () => {
     });
 
     test('JS functions can overwrite native functions', () => {
-      const atoi = () => "ok";
+      const atoi = () => 'ok';
       template.addSprigFuncs().funcs({ atoi }).parse('{{ atoi "0" }}');
       expect(template.executeString()).toBe('ok');
     });
@@ -144,7 +157,9 @@ describe('Template', () => {
     const inner = template.new('inner').parse('new {{ .param }}');
     expect(inner).toBeInstanceOf(Template);
     expect(inner.name()).toBe('inner');
-    expect(template.executeTemplateString('inner', {param: 'param'})).toBe('new param');
+    expect(template.executeTemplateString('inner', { param: 'param' })).toBe(
+      'new param',
+    );
   });
 
   describe('#option', () => {
@@ -152,11 +167,19 @@ describe('Template', () => {
       template.parse('{{ .param }}');
       expect(template.executeString({})).toBe('<no value>');
       template.option('missingkey=error');
-      expect(() => template.executeString({})).toThrowErrorMatchingInlineSnapshot(`"template: test_template:1:3: executing "test_template" at <.param>: map has no entry for key "param""`);
+      expect(() =>
+        template.executeString({}),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"template: test_template:1:3: executing "test_template" at <.param>: map has no entry for key "param""`,
+      );
     });
 
     it('captures panics', () => {
-      expect(() => template.option('invalidArg')).toThrowErrorMatchingInlineSnapshot(`"caught panic: unrecognized option: invalidArg"`);
+      expect(() =>
+        template.option('invalidArg'),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"caught panic: unrecognized option: invalidArg"`,
+      );
     });
   });
 
@@ -188,7 +211,11 @@ describe('Template', () => {
   test('#addSprigHermeticFuncs works', () => {
     template.addSprigHermeticFuncs().parse('{{ dict "a" 42 }}');
     expect(template.executeString()).toBe('map[a:42]');
-    expect(() => template.parse('{{ uuidv4 }}')).toThrowErrorMatchingInlineSnapshot(`"template: test_template:1: function "uuidv4" not defined"`);
+    expect(() =>
+      template.parse('{{ uuidv4 }}'),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `"template: test_template:1: function "uuidv4" not defined"`,
+    );
   });
 
   test('static .parseFiles works', () => {
@@ -209,7 +236,7 @@ describe('Template', () => {
     const value = (1n << 128n) + 2n; // Endianness test with 64-bit words
     expect(template.executeString(value)).toBe(value.toString());
     expect(template.executeString(-value)).toBe((-value).toString());
-  })
+  });
 });
 
 test('htmlEscapeString works', () => {
