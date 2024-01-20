@@ -101,11 +101,17 @@ describe('Template', () => {
     });
   });
 
-  test('#lookup works', () => {
-    template.parse('{{ define "foo" }}{{ end }}');
-    const fooTemplate = template.lookup('foo');
-    expect(fooTemplate).toBeInstanceOf(Template);
-    expect(fooTemplate?.name()).toBe('foo');
+  describe('#lookup', () => {
+    it('works', () => {
+      template.parse('{{ define "foo" }}{{ end }}');
+      const fooTemplate = template.lookup('foo');
+      expect(fooTemplate).toBeInstanceOf(Template);
+      expect(fooTemplate?.name()).toBe('foo');
+    });
+
+    it('returns undefined on invalid templates', () => {
+      expect(template.lookup('invalid')).toBeUndefined();
+    });
   });
 
   test('#name works', () => {
