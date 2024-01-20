@@ -1,0 +1,147 @@
+name: binaries
+on:
+  workflow_call:
+    inputs:
+      provenance:
+        required: false
+        type: boolean
+      upload-assets:
+        required: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  third-party-licenses:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/google/go-licenses@v1.6.0
+      - name: Download third-party license files
+        run: |
+          go-licenses save ./... --ignore $(go list -m) --save_path packaging/third-party
+          chmod -R u+w packaging/third-party
+      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        with:
+          name: third-party-licenses
+          path: packaging/third-party/
+
+  binaries:
+    needs: [third-party-licenses]
+    strategy:
+      matrix:
+        os: [macos-12, ubuntu-22.04]
+    outputs:
+      hash-macos-12: ${{ steps.hash.outputs.hash-macos-12 }}
+      hash-ubuntu-22.04: ${{ steps.hash.outputs['hash-ubuntu-22.04'] }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+        with:
+          node-version: '18'
+          cache: npm
+
+      # Install dependencies
+      - name: Install cross-compilers
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - run: npm ci --ignore-scripts
+      # Retrieve third-party license files to include in binary packages
+      - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+        with:
+          name: third-party-licenses
+          path: packaging/third-party/
+
+      # Native (amd64) build, plus tests for good measure
+      - run: |
+          ./node_modules/.bin/node-pre-gyp rebuild
+          ./node_modules/.bin/node-pre-gyp package
+          mkdir binaries
+          mv build/stage/*/* binaries
+      - run: npm run test
+      # arm64 build
+      - run: |
+          ${{ runner.os == 'Linux' }} && export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
+          ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm64
+          ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
+          mv build/stage/*/* binaries
+          ls -lR binaries
+        env:
+          CGO_ENABLED: '1'
+          GOARCH: arm64
+
+      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        with:
+          name: binaries-${{ matrix.os }}
+          path: binaries/
+      - id: hash
+        run: echo "hash-${{ matrix.os }}=$(openssl sha256 -r * | tr '*' ' ' | jq -Rrs @base64)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        working-directory: binaries
+
+  upload-binaries:
+    if: inputs.upload-assets
+    needs: [binaries]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+        with:
+          pattern: binaries-*
+          merge-multiple: true
+          path: binaries
+      - run: gh release upload '${{ github.ref_name }}' ./binaries/*.tar.gz
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  binary-hashes:
+    if: inputs.provenance
+    needs: [binaries]
+    runs-on: ubuntu-22.04
+    outputs:
+      hashes: ${{ steps.combine.outputs.hashes }}
+    steps:
+      - id: combine
+        run: echo "hashes=$(jq -nr '[env.HASHES|fromjson|.[]|@base64d]|join("")|@base64')" >> "$GITHUB_OUTPUT"
+        env:
+          HASHES: ${{ toJSON(needs.binaries.outputs) }}
+      - run: "echo '${{ steps.combine.outputs.hashes }}'"
+
+  binary-provenance:
+    if: inputs.provenance
+    needs: [binary-hashes]
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
+    with:
+      base64-subjects: ${{ needs.binary-hashes.outputs.hashes }}
+      provenance-name: binaries.intoto.jsonl
+
+  upload-binary-provenance:
+    if: inputs.provenance && inputs.upload-assets
+    needs: [binary-provenance]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+        with:
+          name: ${{ needs.binary-provenance.outputs.provenance-name }}
+      - run: gh release upload '${{ github.ref_name }}' '${{ needs.binary-provenance.outputs.provenance-name }}'
+        env:
+          GH_TOKEN: ${{ github.token }}
