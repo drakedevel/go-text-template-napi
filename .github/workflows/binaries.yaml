@@ -54,7 +54,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get -y install g++-aarch64-linux-gnu g++-arm-linux-gnueabihf
       - run: npm ci --ignore-scripts
       # Retrieve third-party license files to include in binary packages
       - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
@@ -63,19 +63,31 @@ jobs:
           path: packaging/third-party/
 
       # Native (amd64) build, plus tests for good measure
-      - run: |
+      - name: Build for amd64
+        run: |
           ./node_modules/.bin/node-pre-gyp rebuild
           ./node_modules/.bin/node-pre-gyp package
           mkdir binaries
           mv build/stage/*/* binaries
       - run: npm run test
-      # arm64 build
-      - run: |
+      # Cross builds
+      - name: Build for arm
+        if: runner.os == 'Linux'
+        run: |
+          ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm
+          ./node_modules/.bin/node-pre-gyp package --target_arch=arm
+          mv build/stage/*/* binaries
+        env:
+          CC: arm-linux-gnueabihf-gcc
+          CXX: arm-linux-gnueabihf-g++
+          CGO_ENABLED: '1'
+          GOARCH: arm
+      - name: Build for arm64
+        run: |
           ${{ runner.os == 'Linux' }} && export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
           ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm64
           ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
           mv build/stage/*/* binaries
-          ls -lR binaries
         env:
           CGO_ENABLED: '1'
           GOARCH: arm64
@@ -117,7 +129,6 @@ jobs:
         run: echo "hashes=$(jq -nr '[env.HASHES|fromjson|.[]|@base64d]|join("")|@base64')" >> "$GITHUB_OUTPUT"
         env:
           HASHES: ${{ toJSON(needs.binaries.outputs) }}
-      - run: "echo '${{ steps.combine.outputs.hashes }}'"
 
   binary-provenance:
     if: inputs.provenance
