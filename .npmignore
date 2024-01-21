@@ -1,5 +1,8 @@
 /.*
 /build/
 /build-tmp-*/
+/jest.config.js
 /lib/napi-*/
 /packaging/third-party/
+/tests/
+/tsconfig.json
