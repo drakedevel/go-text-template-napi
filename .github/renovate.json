@@ -1,4 +1,17 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices", "npm:unpublishSafe"]
+  "extends": ["config:best-practices", "npm:unpublishSafe"],
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["slsa-framework/slsa-github-generator"],
+      "pinDigests": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["actions/download-artifact"],
+      "matchCurrentVersion": "^3.0.0",
+      "allowedVersions": "^3.0.0"
+    }
+  ]
 }
