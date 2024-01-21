@@ -32,7 +32,7 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_nodejs_slsa3.yml@v1.9.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_nodejs_slsa3.yml@07e64b653f10a80b6510f4568f685f8b7b9ea830 # v1.9.0
 
   npm-package-unsigned:
     if: '!inputs.provenance'
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
 
       - if: inputs.provenance
-        uses: slsa-framework/slsa-github-generator/actions/nodejs/secure-package-download@v1.9.0
+        uses: slsa-framework/slsa-github-generator/actions/nodejs/secure-package-download@07e64b653f10a80b6510f4568f685f8b7b9ea830 # v1.9.0
         with:
           name: ${{ needs.npm-package-provenance.outputs.package-download-name }}
           path: ${{ needs.npm-package-provenance.outputs.package-name }}
@@ -74,7 +74,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - if: inputs.provenance
-        uses: slsa-framework/slsa-github-generator/actions/nodejs/secure-attestations-download@v1.9.0
+        uses: slsa-framework/slsa-github-generator/actions/nodejs/secure-attestations-download@07e64b653f10a80b6510f4568f685f8b7b9ea830 # v1.9.0
         with:
           name: ${{ needs.npm-package-provenance.outputs.provenance-download-name }}
           path: attestations
