@@ -10,8 +10,8 @@
     {
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["actions/download-artifact"],
-      "matchCurrentVersion": "^3.0.0",
-      "allowedVersions": "^3.0.0"
+      "matchCurrentVersion": "/^v3\\./",
+      "allowedVersions": "/^v3\\./"
     }
   ]
 }
