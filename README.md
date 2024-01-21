@@ -1,3 +1,4 @@
+[![NPM Version](https://img.shields.io/npm/v/go-text-template-napi)](https://www.npmjs.com/package/go-text-template-napi)
 [![codecov](https://codecov.io/gh/drakedevel/go-text-template-napi/graph/badge.svg?token=5ADSAXMWON)](https://codecov.io/gh/drakedevel/go-text-template-napi)
 
 # go-text-template-napi
