@@ -1,5 +1,6 @@
 [![NPM Version](https://img.shields.io/npm/v/go-text-template-napi)](https://www.npmjs.com/package/go-text-template-napi)
 [![codecov](https://codecov.io/gh/drakedevel/go-text-template-napi/graph/badge.svg?token=5ADSAXMWON)](https://codecov.io/gh/drakedevel/go-text-template-napi)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/drakedevel/go-text-template-napi/badge)](https://securityscorecards.dev/viewer/?uri=github.com/drakedevel/go-text-template-napi)
 
 # go-text-template-napi
 
