@@ -1,1 +1,3 @@
 comment: false
+coverage:
+  range: 50..80
