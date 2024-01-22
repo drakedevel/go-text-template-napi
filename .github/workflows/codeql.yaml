@@ -42,7 +42,7 @@ jobs:
           languages: go
           queries: security-extended,security-and-quality
 
-      - run: ./node_modules/.bin/node-pre-gyp rebuild
+      - run: npx -c 'node-pre-gyp rebuild'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@0b21cf2492b6b02c465a3e5d7c473717ad7721ba # v3.23.1

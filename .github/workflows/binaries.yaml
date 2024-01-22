@@ -65,8 +65,8 @@ jobs:
       # Native (amd64) build, plus tests for good measure
       - name: Build for amd64
         run: |
-          ./node_modules/.bin/node-pre-gyp rebuild
-          ./node_modules/.bin/node-pre-gyp package
+          npx -c 'node-pre-gyp rebuild'
+          npx -c 'node-pre-gyp package'
           mkdir binaries
           mv build/stage/*/* binaries
       - run: npm run test
@@ -74,8 +74,8 @@ jobs:
       - name: Build for arm
         if: runner.os == 'Linux'
         run: |
-          ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm
-          ./node_modules/.bin/node-pre-gyp package --target_arch=arm
+          npx -c 'node-pre-gyp rebuild --target_arch=arm'
+          npx -c 'node-pre-gyp package --target_arch=arm'
           mv build/stage/*/* binaries
         env:
           CC: arm-linux-gnueabihf-gcc
@@ -85,8 +85,8 @@ jobs:
       - name: Build for arm64
         run: |
           ${{ runner.os == 'Linux' }} && export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
-          ./node_modules/.bin/node-pre-gyp rebuild --target_arch=arm64
-          ./node_modules/.bin/node-pre-gyp package --target_arch=arm64
+          npx -c 'node-pre-gyp rebuild --target_arch=arm64'
+          npx -c 'node-pre-gyp package --target_arch=arm64'
           mv build/stage/*/* binaries
         env:
           CGO_ENABLED: '1'
