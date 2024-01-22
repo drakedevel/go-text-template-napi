@@ -34,10 +34,11 @@ jobs:
     needs: [third-party-licenses]
     strategy:
       matrix:
-        os: [macos-12, ubuntu-22.04]
+        os: [windows-2022] # [macos-12, ubuntu-22.04]
     outputs:
       hash-macos-12: ${{ steps.hash.outputs.hash-macos-12 }}
       hash-ubuntu-22.04: ${{ steps.hash.outputs['hash-ubuntu-22.04'] }}
+      hash-windows-2022: ${{ steps.hash.outputs['hash-windows-2022'] }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -63,6 +64,8 @@ jobs:
           path: packaging/third-party/
 
       # Native (amd64) build, plus tests for good measure
+      - run: 'go list -f "{{ range .GoFiles }}{{ $.Dir }}/{{ . }} {{ end }}{{ range .CgoFiles }}{{ $.Dir }}/{{ . }} {{ end }}" ./...'
+        shell: cmd
       - name: Build for amd64
         run: |
           npx -c 'node-pre-gyp rebuild'
@@ -83,6 +86,7 @@ jobs:
           CGO_ENABLED: '1'
           GOARCH: arm
       - name: Build for arm64
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           ${{ runner.os == 'Linux' }} && export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
           npx -c 'node-pre-gyp rebuild --target_arch=arm64'
