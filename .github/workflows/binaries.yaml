@@ -25,7 +25,7 @@ jobs:
         run: |
           go-licenses save ./... --ignore $(go list -m) --save_path packaging/third-party
           chmod -R u+w packaging/third-party
-      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+      - uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
         with:
           name: third-party-licenses
           path: packaging/third-party/
@@ -92,7 +92,7 @@ jobs:
           CGO_ENABLED: '1'
           GOARCH: arm64
 
-      - uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+      - uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
         with:
           name: binaries-${{ matrix.os }}
           path: binaries/
