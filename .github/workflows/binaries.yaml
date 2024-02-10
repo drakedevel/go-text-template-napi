@@ -57,7 +57,7 @@ jobs:
           sudo apt-get -y install g++-aarch64-linux-gnu g++-arm-linux-gnueabihf
       - run: npm ci --ignore-scripts
       # Retrieve third-party license files to include in binary packages
-      - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+      - uses: actions/download-artifact@eaceaf801fd36c7dee90939fad912460b18a1ffe # v4.1.2
         with:
           name: third-party-licenses
           path: packaging/third-party/
@@ -109,7 +109,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - uses: actions/download-artifact@6b208ae046db98c579e8a3aa621ab581ff575935 # v4.1.1
+      - uses: actions/download-artifact@eaceaf801fd36c7dee90939fad912460b18a1ffe # v4.1.2
         with:
           pattern: binaries-*
           merge-multiple: true
