@@ -17,7 +17,17 @@
     'conditions': [
       # TODO: Windows support
       ['OS in "aix freebsd linux netbsd openbsd solaris".split()', {
-        'ldflags+': ['-Wl,--whole-archive,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX),--no-whole-archive'],
+        'ldflags+': [
+          # Linker flags used by Go 1.22 with -buildmode=c-shared
+          # nodelete is especially important: since there is no way to stop the
+          # Go runtime, it is never safe to unload a Go shared library. See
+          # golang/go#11100 for more context.
+          # TODO: Consider using c-shared mode directly
+          '-Wl,-z,relro',
+          '-Wl,-z,nodelete',
+          '-Wl,-Bsymbolic',
+          '-Wl,--whole-archive,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX),--no-whole-archive',
+        ],
       }],
       ['OS=="mac"', {
         'xcode_settings': {
