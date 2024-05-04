@@ -9,6 +9,12 @@
     },
     {
       "matchManagers": ["github-actions"],
+      "matchPackagePrefixes": ["actions/", "codecov/", "github/"],
+      "matchUpdateTypes": ["minor", "patch", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "matchManagers": ["github-actions"],
       "matchPackageNames": ["actions/download-artifact"],
       "matchCurrentVersion": "/^v3\\./",
       "allowedVersions": "/^v3\\./"
