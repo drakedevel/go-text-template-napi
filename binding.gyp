@@ -1,12 +1,13 @@
 {
   'targets': [{
     'target_name': '<(module_name)',
+    'type': 'none',
     'actions': [{
       'action_name': 'gobuild',
       'defines': [
         'NAPI_VERSION=<(napi_build_version)',
       ],
-      'outputs': ['<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)'],
+      'outputs': ['<(PRODUCT_DIR)/<(module_name).node'],
       'inputs': [
         'gobuild.py',
         'go.mod',
@@ -14,17 +15,6 @@
       ],
       'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
     }],
-    'conditions': [
-      # TODO: Windows support
-      ['OS in "aix freebsd linux netbsd openbsd solaris".split()', {
-        'ldflags+': ['-Wl,--whole-archive,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX),--no-whole-archive'],
-      }],
-      ['OS=="mac"', {
-        'xcode_settings': {
-          'OTHER_LDFLAGS+': ['-Wl,-force_load,<(INTERMEDIATE_DIR)/golib<(STATIC_LIB_SUFFIX)'],
-        },
-      }],
-    ],
   }, {
     'target_name': 'copy_build',
     'type': 'none',
