@@ -14,7 +14,7 @@ def main():
     cflags = [f'-D{d}' for d in defines] + [f'-I{i}' for i in include_dirs]
     if sys.platform.startswith('darwin'):
         cflags.append('-mmacosx-version-min=10.13')
-    buildflags = ['-buildmode=c-archive', '-o', out_path]
+    buildflags = ['-buildmode=c-shared', '-o', out_path]
     if os.environ.get('GO_TEXT_TEMPLATE_NAPI_COVERAGE') == 'true':
         buildflags.extend(['-cover', '-tags=coverage'])
     if os.environ.get('CI') == 'true':
