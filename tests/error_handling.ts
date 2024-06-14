@@ -1,6 +1,11 @@
 import * as binding from '..';
 import { Template } from '..';
 
+const NO_FILE_ERR =
+  process.platform === 'win32'
+    ? 'cannot find the path specified'
+    : 'no such file or directory';
+
 describe('Template', () => {
   let template: Template;
 
@@ -169,7 +174,7 @@ describe('Template', () => {
 
   test('#parseFiles propagates errors', () => {
     expect(() => template.parseFiles('/invalid/path/to/template/file')).toThrow(
-      'no such file or directory',
+      NO_FILE_ERR,
     );
   });
 
@@ -181,7 +186,7 @@ describe('Template', () => {
 
   test('static .parseFiles propagates errors', () => {
     expect(() => Template.parseFiles('/invalid/path/to/template/file')).toThrow(
-      'no such file or directory',
+      NO_FILE_ERR,
     );
   });
 
