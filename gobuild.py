@@ -5,21 +5,18 @@ import sys
 
 
 def main():
-    if len(sys.argv) != 5:
-        print("Usage: gobuild.py <output> <defines> <includedirs> <libs>")
+    if len(sys.argv) != 4:
+        print("Usage: gobuild.py <output> <defines> <includedirs>")
         sys.exit(1)
     out_path = sys.argv[1]
     defines = shlex.split(sys.argv[2])
     include_dirs = shlex.split(sys.argv[3])
-    libs = shlex.split(sys.argv[4])
     cflags = [f'-D{d}' for d in defines] + [f'-I{i}' for i in include_dirs]
     if sys.platform.startswith('darwin'):
         cflags.append('-mmacosx-version-min=10.13')
     ldflags = []
     if os.name == 'nt':
-        node_lib = [lib for lib in libs if 'node.lib' in lib][0]
-        node_lib = node_lib.replace('-l', '')
-        ldflags.extend([f'-L{os.path.dirname(node_lib)}', '-lnode'])
+        ldflags.append(os.path.join(os.path.dirname(__file__), 'node_api.a'))
     buildflags = ['-buildmode=c-shared', '-o', out_path]
     if os.environ.get('GO_TEXT_TEMPLATE_NAPI_COVERAGE') == 'true':
         buildflags.extend(['-cover', '-tags=coverage'])
