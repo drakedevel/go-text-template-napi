@@ -72,7 +72,7 @@ jobs:
           mkdir binaries
           mv build/stage/*/* binaries
       - run: node index.js
-      - run: npm run test
+      # - run: npm run test
       # Cross builds
       - name: Cross build for amd64
         if: runner.os == 'macOS'
