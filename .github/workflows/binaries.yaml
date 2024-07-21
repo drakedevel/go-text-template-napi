@@ -63,6 +63,8 @@ jobs:
           path: packaging/third-party/
 
       # Native build, plus tests for good measure
+      - run: bash gen_node_api_def.sh
+        if: runner.os == 'Windows'
       - name: Build for ${{ (runner.os == 'macOS' && 'arm64') || 'amd64' }}
         run: |
           npx -c 'node-pre-gyp rebuild'

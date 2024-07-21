@@ -13,7 +13,7 @@
         'go.mod',
         '<!@(bash listfiles.sh)',
       ],
-      'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)', '>(_libraries)'],
+      'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
     }],
   }, {
     'target_name': 'copy_build',
