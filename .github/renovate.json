@@ -9,9 +9,9 @@
     },
     {
       "matchManagers": ["github-actions"],
-      "matchPackagePrefixes": ["actions/", "codecov/", "github/"],
       "matchUpdateTypes": ["minor", "patch", "pinDigest"],
-      "automerge": true
+      "automerge": true,
+      "matchPackageNames": ["actions/{/,}**", "codecov/{/,}**", "github/{/,}**"]
     }
   ]
 }
