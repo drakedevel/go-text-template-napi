@@ -76,7 +76,7 @@ are welcome! Note that Windows support is blocked by Cgo limitations, see
 
 Pre-built binaries are available for Linux and MacOS on 64-bit x86 and ARM. If
 they are unavailable for your platform, the install script will try to build
-them automatically, which requires Go 1.20 or later.
+them automatically, which requires Go 1.21 or later.
 
 ### Warnings
 
