@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   third-party-licenses:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
@@ -115,7 +115,7 @@ jobs:
   upload-binaries:
     if: inputs.upload-assets
     needs: [binaries]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -132,7 +132,7 @@ jobs:
   binary-hashes:
     if: inputs.provenance
     needs: [binaries]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       hashes: ${{ steps.combine.outputs.hashes }}
     steps:
@@ -156,7 +156,7 @@ jobs:
   upload-binary-provenance:
     if: inputs.provenance && inputs.upload-assets
     needs: [binary-provenance]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   sanity-check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Verify package.json has correct version for tag
@@ -24,7 +24,7 @@ jobs:
 
   create-draft-release:
     needs: [sanity-check]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -59,7 +59,7 @@ jobs:
     if: "!contains(github.ref_name, '-')"
     environment: npm-publish
     needs: [binaries, npm-package]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
         with:
