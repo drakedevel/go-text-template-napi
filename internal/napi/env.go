@@ -199,6 +199,7 @@ func (env Env) CreateInt64(value int64) (Value, error) {
 
 func (env Env) CreateDouble(value float64) (Value, error) {
 	var result C.napi_value
+	fmt.Println("calling napi_create_double:", value)
 	status := C.napi_create_double(env.inner, C.double(value), &result)
 	if err := env.mapStatus(status); err != nil {
 		return nil, err
