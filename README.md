@@ -69,14 +69,14 @@ method on `Template`. This API is subject to change.
 ### Requirements
 
 The native component requires Node-API version 8, which is available on all
-supported release lines of Node. It's tested on Linux and MacOS, and will
-probably work on any Unix-like operating system. PRs to expand platform support
-are welcome! Note that Windows support is blocked by Cgo limitations, see
-[Windows Support](#windows-support).
+supported release lines of Node. It's tested on Linux, MacOS, and Windows, and
+will probably work on any other platform supported by Node. PRs to expand
+platform support are welcome!
 
-Pre-built binaries are available for Linux and MacOS on 64-bit x86 and ARM. If
-they are unavailable for your platform, the install script will try to build
-them automatically, which requires Go 1.21 or later.
+Pre-built binaries are available for Linux and MacOS on 64-bit x86 and ARM, and
+for Windows on 64-bit x86. If they are unavailable for your platform, the
+install script will try to build them automatically, which requires Go 1.21 or
+later. On Windows, due to Cgo requirements, you will also need GCC/MinGW.
 
 ### Warnings
 
@@ -106,13 +106,3 @@ of taking a `Writer` parameter. This is faster than a streaming interface given
 the FFI overhead, but it also makes it impossible to limit the memory usage of
 untrusted templates (per the Warnings section). Support for the streaming
 interface is planned for future releases.
-
-### Windows Support
-Cgo on Windows requires GCC and MinGW, which results in a native extension
-module that is ABI-incompatible with the standard Node releases built with MSVC.
-
-MSYS2 ships a MinGW build of Node, and this package *does* work with that. But
-(as far as I know) that is not commonly used, and there does not seem to be a
-way to tell NPM that this package works on MinGW but not native win32. If you
-are using the MinGW build of Node and want to use this package, please file an
-issue to let me know!
