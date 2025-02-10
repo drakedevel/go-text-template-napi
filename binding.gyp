@@ -11,10 +11,23 @@
       'inputs': [
         'gobuild.py',
         'go.mod',
-        '<!@(go list -f \'{{ range .GoFiles }}{{ $.Dir }}/{{ . }} {{ end }}{{ range .CgoFiles }}{{ $.Dir }}/{{ . }} {{ end }}\' ./...)',
+        '<!@(node build-helpers/listfiles.js)',
       ],
       'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
+      'conditions': [
+        ['OS=="win"', {'inputs+': ['<(PRODUCT_DIR)/node_api.a']}],
+      ],
     }],
+    'conditions': [
+      ['OS=="win"', {
+        'actions': [{
+          'action_name': 'gen_node_api',
+          'outputs': ['<(PRODUCT_DIR)/node_api.a'],
+          'inputs': ['build-helpers/gen_node_api_def.js'],
+          'action': ['node', 'build-helpers/gen_node_api_def.js', '<@(_outputs)'],
+        }],
+      }],
+    ],
   }, {
     'target_name': 'copy_build',
     'type': 'none',
