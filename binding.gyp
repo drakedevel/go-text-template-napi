@@ -9,11 +9,11 @@
       ],
       'outputs': ['<(PRODUCT_DIR)/<(module_name).node'],
       'inputs': [
-        'gobuild.py',
+        'build-helpers/gobuild.py',
         'go.mod',
         '<!@(node build-helpers/listfiles.js)',
       ],
-      'action': ['python3', 'gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
+      'action': ['python3', 'build-helpers/gobuild.py', '<@(_outputs)', '>(_defines)', '>(_include_dirs)'],
       'conditions': [
         ['OS=="win"', {'inputs+': ['<(PRODUCT_DIR)/node_api.a']}],
       ],
