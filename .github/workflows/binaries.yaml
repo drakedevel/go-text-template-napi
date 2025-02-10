@@ -34,7 +34,7 @@ jobs:
     needs: [third-party-licenses]
     strategy:
       matrix:
-        os: [windows-2022] # , macos-14, ubuntu-24.04]
+        os: [windows-2025] # , macos-14, ubuntu-24.04]
     outputs:
       hash-macos-14: ${{ steps.hash.outputs.hash-macos-14 }}
       hash-ubuntu-24.04: ${{ steps.hash.outputs['hash-ubuntu-24.04'] }}
@@ -63,14 +63,15 @@ jobs:
           path: packaging/third-party/
 
       # Native build, plus tests for good measure
-      - run: |
-          env
-          tmp="$(mktemp -d)"
-          curl -fsSL -o "${tmp}/mingw.7z" "https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev1.7z"
-          7z x -o"$tmp" "${tmp}/mingw.7z"
-          "${tmp}/mingw64/bin/dlltool" --version
-          PATH="${tmp}/mingw64/bin:${PATH}" bash gen_node_api_def.sh
-        shell: bash
+      # - run: |
+      #     env
+      #     tmp="$(mktemp -d)"
+      #     curl -fsSL -o "${tmp}/mingw.7z" "https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev1.7z"
+      #     7z x -o"$tmp" "${tmp}/mingw.7z"
+      #     "${tmp}/mingw64/bin/dlltool" --version
+      #     PATH="${tmp}/mingw64/bin:${PATH}" bash gen_node_api_def.sh
+      #   shell: bash
+      - run: bash gen_node_api_def.sh
         if: runner.os == 'Windows'
       - name: Build for ${{ (runner.os == 'macOS' && 'arm64') || 'amd64' }}
         run: |
