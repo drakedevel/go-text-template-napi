@@ -1,6 +1,6 @@
 {
   "name": "go-text-template-napi",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "Node-API bindings for Go's text/template package",
   "repository": {
     "type": "git",
