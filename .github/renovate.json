@@ -9,7 +9,7 @@
     },
     {
       "matchManagers": ["github-actions"],
-      "matchPackageNames": ["actions/*", "codecov/*", "github/*"],
+      "matchPackageNames": ["actions/*", "codecov/*", "github/*", "ossf/*"],
       "matchUpdateTypes": ["minor", "patch", "pinDigest"],
       "automerge": true,
       "extends": ["schedule:monthly"]
