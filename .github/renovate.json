@@ -11,6 +11,14 @@
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["actions/*", "codecov/*", "github/*", "ossf/*"],
       "matchUpdateTypes": ["minor", "patch", "pinDigest"],
+      "groupName": "CI actions (non-major)",
+      "automerge": true,
+      "extends": ["schedule:monthly"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "dev dependencies (non-major)",
       "automerge": true,
       "extends": ["schedule:monthly"]
     }
