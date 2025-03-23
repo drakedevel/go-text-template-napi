@@ -75,7 +75,7 @@ platform support are welcome!
 
 Pre-built binaries are available for Linux and MacOS on 64-bit x86 and ARM, and
 for Windows on 64-bit x86. If they are unavailable for your platform, the
-install script will try to build them automatically, which requires Go 1.21 or
+install script will try to build them automatically, which requires Go 1.23 or
 later. On Windows, due to Cgo requirements, you will also need GCC/MinGW.
 
 ### Warnings

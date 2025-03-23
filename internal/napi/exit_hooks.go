@@ -6,7 +6,7 @@ package napi
 // void exitHook();
 import "C"
 
-//go:linkname runtime_runExitHooks runtime.runExitHooks
+//go:linkname runtime_runExitHooks internal/runtime/exithook.Run
 func runtime_runExitHooks(exitCode int)
 
 //export exitHook
