@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"slices"
 
 	"github.com/drakedevel/go-text-template-napi/internal/napi"
 )
@@ -26,8 +27,8 @@ func jsBigintToGo(env napi.Env, value napi.Value) (*big.Int, error) {
 
 	// Convert to big-endian bytes
 	var buf bytes.Buffer
-	for i := len(words) - 1; i >= 0; i-- {
-		err := binary.Write(&buf, binary.BigEndian, words[i])
+	for _, word := range slices.Backward(words) {
+		err := binary.Write(&buf, binary.BigEndian, word)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +84,7 @@ func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 				return nil, err
 			}
 			result := make([]interface{}, length)
-			for i := uint32(0); i < length; i++ {
+			for i := range length {
 				// TODO: Scope?
 				elt, err := env.GetElement(value, i)
 				if err != nil {
@@ -107,7 +108,7 @@ func jsValueToGo(env napi.Env, value napi.Value) (interface{}, error) {
 				return nil, err
 			}
 			result := map[string]interface{}{}
-			for i := uint32(0); i < length; i++ {
+			for i := range length {
 				// TODO: Scope?
 				key, err := env.GetElement(propNames, i)
 				if err != nil {
@@ -175,7 +176,7 @@ func goValueToJs(env napi.Env, value interface{}) (napi.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		for i := 0; i < arrayLen; i++ {
+		for i := range arrayLen {
 			jsVal, err := goValueToJs(env, reflectValue.Index(i).Interface())
 			if err != nil {
 				return nil, err
@@ -190,10 +191,7 @@ func goValueToJs(env napi.Env, value interface{}) (napi.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		iter := reflectValue.MapRange()
-		for iter.Next() {
-			mapKey := iter.Key()
-			mapValue := iter.Value()
+		for mapKey, mapValue := range reflectValue.Seq2() {
 			if mapKey.Kind() != reflect.String {
 				return nil, fmt.Errorf("can't convert Go map key with type %s", mapKey.Type())
 			}

@@ -424,7 +424,7 @@ func (jst *jsTemplate) methodFuncs(env napi.Env, args []napi.Value) (napi.Value,
 	// TODO: Leaks if errors occcur before Funcs succeeds
 	refMap := make(map[string]napi.Ref)
 	funcMap := make(template.FuncMap)
-	for i := uint32(0); i < length; i++ {
+	for i := range length {
 		// TODO: Scope?
 		propNameValue, err := env.GetElement(propNames, i)
 		if err != nil {

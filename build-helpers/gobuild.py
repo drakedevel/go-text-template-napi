@@ -18,12 +18,12 @@ def main():
     if os.name == 'nt':
         ldflags.append(os.path.join(os.path.dirname(out_path), 'node_api.a'))
     buildflags = ['-buildmode=c-shared', '-o', out_path]
-    go_ldflags = []
+    go_ldflags = ['-bindnow']
     if os.environ.get('GO_TEXT_TEMPLATE_NAPI_COVERAGE') == 'true':
         buildflags.extend(['-cover', '-tags=coverage'])
         go_ldflags.append('-checklinkname=0')  # for exithook.Run call
     if os.environ.get('CI') == 'true':
-        go_ldflags.extend(['-s', '-w'])
+        go_ldflags.append('-s')
     if go_ldflags:
         go_ldflag_str = ' '.join(go_ldflags)
         buildflags.append(f'-ldflags={go_ldflag_str}')
