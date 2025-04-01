@@ -61,7 +61,7 @@ jobs:
     needs: [binaries, npm-package]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
         with:
           registry-url: https://registry.npmjs.org
       - uses: slsa-framework/slsa-github-generator/actions/nodejs/publish@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
