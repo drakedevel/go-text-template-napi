@@ -40,3 +40,27 @@ jobs:
         uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2
         with:
           use_oidc: true
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/setup
+      - run: npm ci --ignore-scripts
+      - run: go get
+      - run: |
+          ./node_modules/.bin/node-pre-gyp configure
+          gobuild_cmd="$(grep python3 build-tmp-napi-v8/go_text_template_napi_binding.target.mk | cut -d\; -f5)"
+          function builddir() { :; }
+          function extract() {
+            read -r -a defines <<<"$4"
+            read -r -a includes <<<"$5"
+            echo "CGO_CFLAGS=${defines[@]/#/-D} ${includes[@]/#/-I}" >> "$GITHUB_ENV"
+            echo CGO_ENABLED=1 >> "$GITHUB_ENV"
+          }
+          eval "extract ${gobuild_cmd}"
+      - run: echo "$CGO_CFLAGS"
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.1
