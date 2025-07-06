@@ -76,7 +76,8 @@ jobs:
           npx -c 'node-pre-gyp package'
           mkdir binaries
           mv build/stage/*/* binaries
-      - run: npm run test
+      - run: npm run test -- -i
+        shell: bash
       # Cross builds
       - name: Cross build for amd64
         if: runner.os == 'macOS'
