@@ -1,3 +1,5 @@
+import { beforeEach, describe, expect, it, jest, test } from '@jest/globals';
+
 import * as binding from '..';
 import { Template } from '..';
 
