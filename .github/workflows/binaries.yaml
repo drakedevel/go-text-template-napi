@@ -34,11 +34,11 @@ jobs:
     needs: [third-party-licenses]
     strategy:
       matrix:
-        os: [macos-15, ubuntu-24.04, windows-2022]
+        os: [macos-15, ubuntu-24.04, windows-2025]
     outputs:
       hash-macos-15: ${{ steps.hash.outputs.hash-macos-15 }}
       hash-ubuntu-24.04: ${{ steps.hash.outputs['hash-ubuntu-24.04'] }}
-      hash-windows-2022: ${{ steps.hash.outputs['hash-windows-2022'] }}
+      hash-windows-2025: ${{ steps.hash.outputs['hash-windows-2025'] }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -57,15 +57,14 @@ jobs:
           name: third-party-licenses
           path: packaging/third-party/
 
-      # The version of MinGW installed on the windows-2022 runner has a bug in
-      # dlltool that breaks passing floating-point parameters to Node, so fetch
-      # a newer version.
-      # TODO: Remove after upgrading to windows-2025 runner
-      - name: Install newer MinGW dlltool
+      # As of 2025-07-06, the windows-2025 runners include MinGW build 14.2.0-rt_v12-rev2,
+      # which seems to produe broken binaries for us. 15.1.0-rt_v12-rev0 also seems to be
+      # affected, so just install g++ from the last-known-good release.
+      - name: Install older MinGW g++
         run: |
           curl -fsSL -o '${{ runner.temp }}\mingw.7z' 'https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev1.7z'
           7z x -o'${{ runner.temp }}' '${{ runner.temp }}\mingw.7z'
-          echo 'DLLTOOL=${{ runner.temp }}\mingw64\bin\dlltool.exe' >> "$GITHUB_ENV"
+          echo 'CXX=${{ runner.temp }}\mingw64\bin\g++.exe' >> "$GITHUB_ENV"
         shell: bash
         if: runner.os == 'Windows'
 
