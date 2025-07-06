@@ -57,6 +57,18 @@ jobs:
           name: third-party-licenses
           path: packaging/third-party/
 
+      # The version of MinGW installed on the windows-2022 runner has a bug in
+      # dlltool that breaks passing floating-point parameters to Node, so fetch
+      # a newer version.
+      # TODO: Remove after upgrading to windows-2025 runner
+      - name: Install newer MinGW dlltool
+        run: |
+          curl -fsSL -o '${{ runner.temp }}\mingw.7z' 'https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev1.7z'
+          7z x -o'${{ runner.temp }}' '${{ runner.temp }}\mingw.7z'
+          echo 'DLLTOOL=${{ runner.temp }}\mingw64\bin\dlltool.exe' >> "$GITHUB_ENV"
+        shell: bash
+        if: runner.os == 'Windows'
+
       # Native build, plus tests for good measure
       - name: Build for ${{ (runner.os == 'macOS' && 'arm64') || 'amd64' }}
         run: |
