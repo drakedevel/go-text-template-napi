@@ -138,6 +138,8 @@ jobs:
           path: binaries
       - run: mkdir lib && tar xf binaries/win32-x64-napi-v8.tar.gz -C lib
         shell: bash
+      - run: node -p "require('.')"
+        shell: bash
       - run: node -p "require('.').jsEscaper('<b>')"
         shell: bash
       - run: ./node_modules/.bin/jest -i
