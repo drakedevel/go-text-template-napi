@@ -76,8 +76,8 @@ jobs:
           npx -c 'node-pre-gyp package'
           mkdir binaries
           mv build/stage/*/* binaries
-      - run: npm run test -- -i
-        shell: bash
+      - run: npm run test
+        if: runner.os != 'Windows'
       # Cross builds
       - name: Cross build for amd64
         if: runner.os == 'macOS'
@@ -119,6 +119,29 @@ jobs:
         run: echo "hash-${{ matrix.os }}=$(openssl sha256 -r * | tr '*' ' ' | jq -Rrs @base64)" >> "$GITHUB_OUTPUT"
         shell: bash
         working-directory: binaries
+
+  test-win-binaries:
+    needs: [binaries]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/setup
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: binaries-windows-*
+          merge-multiple: true
+          path: binaries
+      - run: mkdir lib && tar xf binaries/win32-x64-napi-v8.tar.gz -C lib
+        shell: bash
+      - run: node -p "require('.').jsEscaper('<b>')"
+        shell: bash
+      - run: ./node_modules/.bin/jest -i
+        shell: bash
 
   upload-binaries:
     if: inputs.upload-assets
