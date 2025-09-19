@@ -8,14 +8,13 @@ jobs:
   binaries:
     uses: ./.github/workflows/binaries.yaml
     permissions:
-      actions: read
+      attestations: write
       contents: write
       id-token: write
 
   npm-package:
     uses: ./.github/workflows/npm_package.yaml
     permissions:
-      actions: read
       contents: write
       id-token: write
 

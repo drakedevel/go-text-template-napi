@@ -2,85 +2,35 @@ name: npm_package
 on:
   workflow_call:
     inputs:
-      provenance:
-        required: false
-        type: boolean
       upload-assets:
         required: false
         type: boolean
     outputs:
-      package-download-name:
-        value: ${{ jobs.npm-package-provenance.outputs.package-download-name }}
-      package-download-sha256:
-        value: ${{ jobs.npm-package-provenance.outputs.package-download-sha256 }}
-      package-name:
-        value: ${{ jobs.npm-package-provenance.outputs.package-name }}
-      provenance-download-name:
-        value: ${{ jobs.npm-package-provenance.outputs.provenance-download-name }}
-      provenance-download-sha256:
-        value: ${{ jobs.npm-package-provenance.outputs.provenance-download-sha256 }}
-      provenance-name:
-        value: ${{ jobs.npm-package-provenance.outputs.provenance-name }}
+      artifact-id:
+        value: ${{ jobs.npm-package.outputs.artifact-id }}
 
 permissions:
   contents: read
 
 jobs:
-  npm-package-provenance:
-    if: inputs.provenance
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_nodejs_slsa3.yml@v2.1.0
-
-  npm-package-unsigned:
-    if: '!inputs.provenance'
+  npm-package:
     runs-on: ubuntu-24.04
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: ./.github/actions/setup
         with:
           skip-go: 'true'
       - run: npm pack
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: npm-package
           path: go-text-template-napi-*.tgz
-
-  upload-npm-package:
-    if: inputs.upload-assets && !(failure() || cancelled())
-    needs: [npm-package-provenance, npm-package-unsigned]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - if: inputs.provenance
-        uses: slsa-framework/slsa-github-generator/actions/nodejs/secure-package-download@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
-        with:
-          name: ${{ needs.npm-package-provenance.outputs.package-download-name }}
-          path: ${{ needs.npm-package-provenance.outputs.package-name }}
-          sha256: ${{ needs.npm-package-provenance.outputs.package-download-sha256 }}
-
-      - if: '!inputs.provenance'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: npm-package
-
       - run: gh release upload '${{ github.ref_name }}' go-text-template-napi-*.tgz
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - if: inputs.provenance
-        uses: slsa-framework/slsa-github-generator/actions/nodejs/secure-attestations-download@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
-        with:
-          name: ${{ needs.npm-package-provenance.outputs.provenance-download-name }}
-          path: attestations
-          sha256: ${{ needs.npm-package-provenance.outputs.provenance-download-sha256 }}
-
-      - if: inputs.provenance
-        run: gh release upload '${{ github.ref_name }}' 'attestations/${{ needs.npm-package-provenance.outputs.provenance-download-name }}/${{ needs.npm-package-provenance.outputs.provenance-name }}'
+        if: inputs.upload-assets
         env:
           GH_TOKEN: ${{ github.token }}

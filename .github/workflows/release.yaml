@@ -29,7 +29,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: gh release create ${{ github.ref_name }} -d --generate-notes --verify-tag
+      - run: gh release create ${{ github.ref_name }} -d -t ${{ github.ref_name }} --verify-tag
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -37,7 +37,7 @@ jobs:
     needs: [create-draft-release]
     uses: ./.github/workflows/binaries.yaml
     permissions:
-      actions: read
+      attestations: write
       contents: write
       id-token: write
     with:
@@ -48,11 +48,8 @@ jobs:
     needs: [create-draft-release]
     uses: ./.github/workflows/npm_package.yaml
     permissions:
-      actions: read
       contents: write
-      id-token: write
     with:
-      provenance: true
       upload-assets: true
 
   npm-publish:
@@ -60,16 +57,14 @@ jobs:
     environment: npm-publish
     needs: [binaries, npm-package]
     runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           registry-url: https://registry.npmjs.org
-      - uses: slsa-framework/slsa-github-generator/actions/nodejs/publish@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+          version: 24
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          node-auth-token: ${{ secrets.NPM_TOKEN }}
-          package-name: ${{ needs.npm-package.outputs.package-name }}
-          package-download-name: ${{ needs.npm-package.outputs.package-download-name }}
-          package-download-sha256: ${{ needs.npm-package.outputs.package-download-sha256 }}
-          provenance-name: ${{ needs.npm-package.outputs.provenance-name }}
-          provenance-download-name: ${{ needs.npm-package.outputs.provenance-download-name }}
-          provenance-download-sha256: ${{ needs.npm-package.outputs.provenance-download-sha256 }}
+          artifact-ids: ${{ needs.npm-package.outputs.artifact-id }}
+      - run: npm publish go-text-template-napi-*.tgz

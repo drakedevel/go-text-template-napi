@@ -135,41 +135,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  binary-hashes:
+  binary-provenance:
     if: inputs.provenance
     needs: [binaries]
     runs-on: ubuntu-24.04
-    outputs:
-      hashes: ${{ steps.combine.outputs.hashes }}
-    steps:
-      - id: combine
-        run: echo "hashes=$(jq -nr '[env.HASHES|fromjson|.[]|@base64d]|join("")|@base64')" >> "$GITHUB_OUTPUT"
-        env:
-          HASHES: ${{ toJSON(needs.binaries.outputs) }}
-
-  binary-provenance:
-    if: inputs.provenance
-    needs: [binary-hashes]
     permissions:
-      actions: read
+      attestations: write
       contents: write
       id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
-    with:
-      base64-subjects: ${{ needs.binary-hashes.outputs.hashes }}
-      provenance-name: binaries.intoto.jsonl
-
-  upload-binary-provenance:
-    if: inputs.provenance && inputs.upload-assets
-    needs: [binary-provenance]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ${{ needs.binary-provenance.outputs.provenance-name }}
-      - run: gh release upload '${{ github.ref_name }}' '${{ needs.binary-provenance.outputs.provenance-name }}'
+      - run: jq -nr 'env.HASHES|fromjson|.[]|@base64d|rtrimstr("\n")' | sort -k2 > checksums.txt
         env:
+          HASHES: ${{ toJSON(needs.binaries.outputs) }}
+      - id: attest
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-checksums: checksums.txt
+      - run: |
+          jq -c . '${{ steps.attest.outputs.bundle-path }}' > binaries.intoto.jsonl
+          gh release upload '${{ github.ref_name }}' binaries.intoto.jsonl
+        if: inputs.upload-assets
+        env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}

@@ -4,11 +4,6 @@
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
-      "matchPackageNames": ["slsa-framework/slsa-github-generator"],
-      "pinDigests": false
-    },
-    {
-      "matchManagers": ["github-actions"],
       "matchPackageNames": ["actions/*", "codecov/*", "github/*", "ossf/*"],
       "matchUpdateTypes": ["minor", "patch", "pinDigest"],
       "groupName": "CI actions (non-major)",
