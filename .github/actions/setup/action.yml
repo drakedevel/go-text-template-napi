@@ -7,14 +7,10 @@ inputs:
 runs:
   using: composite
   steps:
-    # TODO: Remove once setup-go supports reading toolchain line
-    - id: toolchain
-      run: grep '^toolchain' go.mod | sed 's/^toolchain go/go_version=/' >> "$GITHUB_OUTPUT"
-      shell: bash
     - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
       if: inputs.skip-go == ''
       with:
-        go-version: ${{ steps.toolchain.outputs.go_version }}
+        go-version-file: go.mod
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       if: inputs.skip-node == ''
       with:
