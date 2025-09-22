@@ -36,9 +36,9 @@ jobs:
       matrix:
         os: [macos-15, ubuntu-24.04, windows-2025]
     outputs:
-      hash-macos-15: ${{ steps.hash.outputs.hash-macos-15 }}
-      hash-ubuntu-24.04: ${{ steps.hash.outputs['hash-ubuntu-24.04'] }}
-      hash-windows-2025: ${{ steps.hash.outputs['hash-windows-2025'] }}
+      id-macos-15: ${{ steps.output.outputs.id-macos-15 }}
+      id-ubuntu-24.04: ${{ steps.output.outputs['id-ubuntu-24.04'] }}
+      id-windows-2025: ${{ steps.output.outputs['id-windows-2025'] }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -109,34 +109,17 @@ jobs:
           CGO_ENABLED: '1'
           GOARCH: arm64
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: binaries-${{ matrix.os }}
           path: binaries/
-      - id: hash
-        run: echo "hash-${{ matrix.os }}=$(openssl sha256 -r * | tr '*' ' ' | jq -Rrs @base64)" >> "$GITHUB_OUTPUT"
+      - id: output
+        run: echo "id-${{ matrix.os }}=${{ steps.upload.outputs.artifact-id }}" >> "$GITHUB_OUTPUT"
         shell: bash
-        working-directory: binaries
 
-  upload-binaries:
-    if: inputs.upload-assets
-    needs: [binaries]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          pattern: binaries-*
-          merge-multiple: true
-          path: binaries
-      - run: gh release upload '${{ github.ref_name }}' ./binaries/*.tar.gz
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  binary-provenance:
-    if: inputs.provenance
+  attest-upload-binaries:
+    if: inputs.provenance || inputs.upload-assets
     needs: [binaries]
     runs-on: ubuntu-24.04
     permissions:
@@ -144,17 +127,29 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - run: jq -nr 'env.HASHES|fromjson|.[]|@base64d|rtrimstr("\n")' | sort -k2 > checksums.txt
+      - id: artifacts
+        run: echo "ids=$(jq -nr '[env.INPUTS|fromjson|.[]]|join(",")')" >> "$GITHUB_OUTPUT"
         env:
-          HASHES: ${{ toJSON(needs.binaries.outputs) }}
+          INPUTS: ${{ toJSON(needs.binaries.outputs) }}
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          artifact-ids: ${{ steps.artifacts.outputs.ids }}
+          merge-multiple: true
+          path: binaries
       - id: attest
+        if: inputs.provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-checksums: checksums.txt
+          subject-path: ./binaries/*.tar.gz
+      - run: gh release upload '${{ github.ref_name }}' ./binaries/*.tar.gz
+        if: inputs.upload-assets
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
       - run: |
           jq -c . '${{ steps.attest.outputs.bundle-path }}' > binaries.intoto.jsonl
           gh release upload '${{ github.ref_name }}' binaries.intoto.jsonl
-        if: inputs.upload-assets
+        if: inputs.provenance && inputs.upload-assets
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
