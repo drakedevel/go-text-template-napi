@@ -53,8 +53,7 @@ jobs:
       upload-assets: true
 
   npm-publish:
-    if: "!contains(github.ref_name, '-')"
-    environment: npm-publish
+    environment: ${{ (!contains(github.ref_name, '-') && 'npm-publish') || null }}
     needs: [binaries, npm-package]
     runs-on: ubuntu-24.04
     permissions:
@@ -63,8 +62,9 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           registry-url: https://registry.npmjs.org
-          version: 24
+          node-version: 24
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           artifact-ids: ${{ needs.npm-package.outputs.artifact-id }}
       - run: npm publish go-text-template-napi-*.tgz
+        if: "!contains(github.ref_name, '-')"
