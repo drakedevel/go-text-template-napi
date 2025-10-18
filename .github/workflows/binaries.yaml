@@ -60,17 +60,6 @@ jobs:
           artifact-ids: ${{ needs.third-party-licenses.outputs.artifact-id }}
           path: packaging/third-party/
 
-      # As of 2025-07-06, the windows-2025 runners include MinGW build 14.2.0-rt_v12-rev2,
-      # which seems to produe broken binaries for us. 15.1.0-rt_v12-rev0 also seems to be
-      # affected, so just install g++ from the last-known-good release.
-      - name: Install older MinGW g++
-        run: |
-          curl -fsSL -o '${{ runner.temp }}\mingw.7z' 'https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev1.7z'
-          7z x -o'${{ runner.temp }}' '${{ runner.temp }}\mingw.7z'
-          echo 'CXX=${{ runner.temp }}\mingw64\bin\g++.exe' >> "$GITHUB_ENV"
-        shell: bash
-        if: runner.os == 'Windows'
-
       # Native build, plus tests for good measure
       - name: Build for ${{ (runner.os == 'macOS' && 'arm64') || 'amd64' }}
         run: |
