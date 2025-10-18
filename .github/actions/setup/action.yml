@@ -15,4 +15,3 @@ runs:
       if: inputs.skip-node == ''
       with:
         node-version: '20'
-        cache: npm
