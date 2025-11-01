@@ -26,7 +26,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@mapbox/node-pre-gyp": "^1.0.10"
+    "@mapbox/node-pre-gyp": "^2.0.0"
   },
   "devDependencies": {
     "@jest/globals": "30.2.0",
