@@ -2,7 +2,7 @@ module github.com/drakedevel/go-text-template-napi
 
 go 1.23.0
 
-toolchain go1.25.3
+toolchain go1.25.4
 
 require github.com/Masterminds/sprig/v3 v3.3.0
 
