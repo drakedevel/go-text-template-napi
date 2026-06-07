@@ -17,6 +17,9 @@ func jsBigintToGo(env napi.Env, value napi.Value) (*big.Int, error) {
 	if err := env.GetValueBigintWords(value, nil, &wordCount, nil); err != nil {
 		return nil, err
 	}
+	if wordCount == 0 {
+		return new(big.Int), nil
+	}
 
 	// Allocate space and get contents
 	var signBit int
