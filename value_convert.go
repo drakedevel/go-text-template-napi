@@ -194,6 +194,7 @@ func goValueToJs(env napi.Env, value interface{}) (napi.Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		propArray := make([]napi.PropertyDescriptor, 0, reflectValue.Len())
 		for mapKey, mapValue := range reflectValue.Seq2() {
 			if mapKey.Kind() != reflect.String {
 				return nil, fmt.Errorf("can't convert Go map key with type %s", mapKey.Type())
@@ -206,9 +207,14 @@ func goValueToJs(env napi.Env, value interface{}) (napi.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			if err := env.SetProperty(jsObj, jsKey, jsValue); err != nil {
-				return nil, err
-			}
+			propArray = append(propArray, napi.PropertyDescriptor{
+				Name:       jsKey,
+				Value:      jsValue,
+				Attributes: napi.DefaultJsProperty,
+			})
+		}
+		if err := env.DefineProperties(jsObj, propArray); err != nil {
+			return nil, err
 		}
 		return jsObj, nil
 	case reflect.String:

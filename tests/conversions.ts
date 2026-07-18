@@ -20,7 +20,9 @@ describe('JS-Go value conversion', () => {
     fc.dictionary(fc.string(), arbScalar),
   );
 
-  it.prop([arbValue])('should roundtrip', (val) => {
+  it.prop([arbValue], {
+    examples: [[{ ['__proto__']: '' }]],
+  })('should roundtrip', (val) => {
     const jsFn = jest.fn();
     const template = new Template('t').funcs({ jsFn }).parse('{{ jsFn .val }}');
     template.executeString({ val });
